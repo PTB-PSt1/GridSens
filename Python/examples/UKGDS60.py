@@ -110,8 +110,6 @@ def simulate_data(S, gen=None, verbose = 0):
 	v_ang = np.zeros((13,t_f))
 	P = np.zeros((13,t_f))
 	Q = np.zeros((13,t_f))
-	genP_all = np.zeros((2,t_f))
-	genQ_all = np.zeros((2,t_f))
 	P_into_00 = np.zeros(t_f)
 	Q_into_00 = np.zeros(t_f)
 
@@ -143,15 +141,11 @@ def simulate_data(S, gen=None, verbose = 0):
 		v_ang[:,n] = resultPF['bus'][:,8] - slack_ang   # Voltage, angle
 		P[:,n] = -resultPF['bus'][:,2]
 		Q[:,n] = -resultPF['bus'][:,3]
-		genP_all[:,n] = resultPF['gen'][:,1]
-		genQ_all[:,n] = resultPF['gen'][:,2]
 		P_into_00[n]=-resultPF['branch'][0,15]
 		Q_into_00[n]=-resultPF['branch'][0,16]
 
 	P[0,:] = P_into_00; P[1,:] = P_into_00
 	Q[0,:] = Q_into_00; Q[1,:] = Q_into_00
-	P[6,:] += genP_all[1,:]
-	Q[6,:] += genQ_all[1,:]
 
 
 	simdata = dict([])
