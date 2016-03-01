@@ -11,11 +11,11 @@ if __name__ == '__main__' and __package__ is None:
 
 
 # indices of measured active power
-PMeasIdx = [2,3]
+PMeasIdx = [2,3,5]
 nPMeas = len(PMeasIdx)
 
 # indices of measured reactive power
-QMeasIdx = [2,3]
+QMeasIdx = [2,3,5]
 nQMeas = len(QMeasIdx)
 
 # indices of measured bus voltage
