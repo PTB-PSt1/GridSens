@@ -93,13 +93,15 @@ def measured_data():
 	Sfc = forecastsNPL["Sfc"]
 	return S, Vs, V, Y, Sfc
 
-def simulate_data(S, gen=None, verbose = 0):
+def simulate_data(Sm, gen=None, PVdata=None, PV_idx=None, verbose = 0):
 	"""
 	Simulate data using power flow analysis
 	:param PVgen: data from PV generation injected at bus 6
 	:return: dict
 	"""
 	from scipy.io import loadmat
+ 
+	S=Sm.copy()
 
 	t_ges = 1440
 	delta_t = 15
@@ -110,10 +112,14 @@ def simulate_data(S, gen=None, verbose = 0):
 	v_ang = np.zeros((13,t_f))
 	P = np.zeros((13,t_f))
 	Q = np.zeros((13,t_f))
+	loadP = np.zeros((13,t_f))
+	loadQ = np.zeros((13,t_f))
+	#genP_all = np.zeros((2,t_f))
+	#genQ_all = np.zeros((2,t_f))
 	P_into_00 = np.zeros(t_f)
 	Q_into_00 = np.zeros(t_f)
 
-	if (len(bus_var)==S.shape[0]):
+	if (len(bus_var)==S.shape[0]):     
 		Pdata = np.real(S)
 		Qdata = np.imag(S)
 	elif (2*len(bus_var)==S.shape[0]):
@@ -121,7 +127,18 @@ def simulate_data(S, gen=None, verbose = 0):
 		Qdata = S[S.shape[0]/2:,:]
 	else:
 		raise ValueError("Powers have wrong dimension.")
+      
+	if isinstance(PVdata,np.ndarray):
+		if len(PVdata.shape)==2:   # P and Q for PVgen
+			if not PVdata.shape[0]==2:
+				PVdata = PVdata.T
+			Pdata[PV_idx,:] = PVdata[0,:]-Pdata[PV_idx,:]
+			Qdata[PV_idx,:] = PVdata[1,:]-Qdata[PV_idx,:]
+		else:
+			Pdata[PV_idx,:] = PVdata[:] -Pdata[PV_idx,:]# with MVA
+			Qdata[PV_idx,:] = np.zeros_like(PVdata)
 
+        
 	casedata = get_topology()
 	for n in range(len(time)):
 		casedata['bus'][bus_var,2] = Pdata[:,n]  #Changing the values for the active power
@@ -139,22 +156,24 @@ def simulate_data(S, gen=None, verbose = 0):
 		slack_ang = resultPF['bus'][1,8]
 		v_mag[:,n] = resultPF['bus'][:,7]               # Voltage, magnitude
 		v_ang[:,n] = resultPF['bus'][:,8] - slack_ang   # Voltage, angle
-		P[:,n] = -resultPF['bus'][:,2]
-		Q[:,n] = -resultPF['bus'][:,3]
+		loadP[:,n] = resultPF['bus'][:,2]
+		loadQ[:,n] = resultPF['bus'][:,3]
 		P_into_00[n]=-resultPF['branch'][0,15]
 		Q_into_00[n]=-resultPF['branch'][0,16]
 
-	P[0,:] = P_into_00; P[1,:] = P_into_00
-	Q[0,:] = Q_into_00; Q[1,:] = Q_into_00
-
-
+	P[4,:] = P[4,:]
+	Q[4,:] = Q[4,:]
+ 
 	simdata = dict([])
-	simdata["Vm"] = v_mag*11/np.sqrt(3)
+	simdata["V"] = (11/(np.sqrt(3)))*np.vstack((v_mag[2:,:]*np.cos(np.radians(v_ang[2:,:])),v_mag[2:,:]*np.sin(np.radians(v_ang[2:,:])))) 
 	simdata["Va"] = v_ang
-	simdata["Pk"] = P
-	simdata["Qk"] = Q
-
+	simdata["Pk"] = loadP[2:,:]
+	simdata["Qk"] = loadQ[2:,:]
+	simdata["P_00"]=P_into_00
+ 	simdata["Q_00"]=Q_into_00
 	return simdata
+ 
+
 
 def create_pseudomeas(simdata,meas_idx,PVdata=None,PV_idx=None):
 	"""Using the power injected at bus 0 (301) and some PV data (simulated),
@@ -162,28 +181,24 @@ def create_pseudomeas(simdata,meas_idx,PVdata=None,PV_idx=None):
 	is assumed available
 	"""
 	from numpy import matlib
-
-	n_K = simdata["Pk"].shape[0]-2
-	Pfc = -simdata["Pk"][0,:]/11 + simdata["Pk"][0,0]/11
-	Qfc = -simdata["Qk"][0,:]/11 + simdata["Qk"][0,0]/11
+	n_K = simdata["Pk"].shape[0]
+	Pfc = simdata["P_00"]/11 + simdata["Pk"][0,0]/11
+	Qfc = simdata["Q_00"]/11 + simdata["Qk"][0,0]/11
 	full_Pf = matlib.repmat(Pfc,n_K,1)
 	full_Qf = matlib.repmat(Qfc,n_K,1)
 	if isinstance(PVdata,np.ndarray):
 		if len(PVdata.shape)==2:   # P and Q for PVgen
 			if not PVdata.shape[0]==2:
 				PVdata = PVdata.T
-			full_Pf[PV_idx,:] = PVdata[0,:]
-			full_Qf[PV_idx,:] = PVdata[1,:]
+			full_Pf[PV_idx,:] =PVdata[0,:]
+			full_Qf[PV_idx,:] =PVdata[1,:]
 		else:
-			full_Pf[PV_idx,:] = PVdata[:] # with MVA
+			full_Pf[PV_idx,:] =PVdata[:]
 			full_Qf[PV_idx,:] = np.zeros_like(PVdata)
-
 	pseudo_meas = dict([])
 	pseudo_meas["Pk"] = np.delete(full_Pf,meas_idx["Pk"],0)
 	pseudo_meas["Qk"] = np.delete(full_Qf,meas_idx["Qk"],0)
-
 	return pseudo_meas
-
 
 def full_network(*args,**kwargs):
 	from numpy import asarray

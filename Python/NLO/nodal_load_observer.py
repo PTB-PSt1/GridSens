@@ -241,7 +241,7 @@ def LinearKalmanFilter(topology, meas, meas_unc, meas_idx, pseudo_meas, model, V
 
 
 def IteratedExtendedKalman(topology, meas, meas_unc, meas_idx, pseudo_meas, model, V0,
-						   Vs, slack_idx=0, Y=None, accuracy=1e-9, maxiter=5):
+						   Vs,slack_idx=0, Y=None, accuracy=1e-9, maxiter=5):
 	"""
 	Iterated Extended Kalman filter for the nodal load observer
 	Real-valued matrices of complex-valued quantities are assumed to be structured as [ [real part], [imag part] ]
@@ -264,23 +264,26 @@ def IteratedExtendedKalman(topology, meas, meas_unc, meas_idx, pseudo_meas, mode
 
 	n = model.dim
 	n_K = len(V0)/2
-
 	pmeas = np.zeros(n_K,dtype = bool); pmeas[meas_idx["Pk"]] = True
 	qmeas = np.zeros(n_K,dtype = bool); qmeas[meas_idx["Qk"]] = True
 	vmeas = np.zeros(n_K,dtype = bool); vmeas[meas_idx["Vm"]] = True
 	Cm,Dnm,Dm = get_system_matrices(pmeas,qmeas,vmeas)
-
 	if not isinstance(Y,np.ndarray):
 		Y = makeYbus(topology["baseMVA"],topology["bus"],topology["branch"])
 	Y00, Ys = separate_Yslack(Y,slack_idx)
-
-	y = np.r_[meas["Vm"], meas["Va"]]
+	y0 = np.zeros((np.size(vmeas[meas_idx["Vm"]]),meas["V"].shape[1]))
+	y1 = np.zeros((np.size(vmeas[meas_idx["Vm"]]),meas["V"].shape[1]))
+	for k,ind in enumerate(vmeas.nonzero()[0]):
+	    y0[k,:] =  meas["V"][ind,:]
+	    y1[k,:] =  meas["V"][ind+n_K,:]
+	y = np.vstack((y0,y1))  
+	#y =np.r_[meas["Vm"], meas["Va"]] 
 
 	Slack = np.linalg.solve(Y00,np.dot(Ys,Vs))
 	Sm = np.r_[meas["Pk"], meas["Qk"]]
 	Sfc = np.r_[pseudo_meas["Pk"], pseudo_meas["Qk"]]
-	u = np.dot(Dm,Sm) + np.dot(Dnm,Sfc)
 
+	u = np.dot(Dm,Sm) + np.dot(Dnm,Sfc)
 	if isinstance(meas_unc["Vm"],float):
 		meas_unc["Vm"] = meas_unc["Vm"]*np.ones_like(meas["Vm"])
 	if isinstance(meas_unc["Va"],float):
@@ -293,7 +296,6 @@ def IteratedExtendedKalman(topology, meas, meas_unc, meas_idx, pseudo_meas, mode
 		divisor = 3*(mu[:n_K]**2 + mu[n_K:]**2)
 		return np.r_[np.c_[np.diag(mu[:n_K]/divisor), np.diag(mu[n_K:]/divisor)],
 				     np.c_[np.diag(mu[n_K:]/divisor), -np.diag(mu[:n_K]/divisor)]]
-
 	nT = y.shape[1]
 	xhat = np.zeros((n,nT))
 	Vhat = np.zeros((2*n_K,nT))
@@ -346,5 +348,3 @@ def IteratedExtendedKalman(topology, meas, meas_unc, meas_idx, pseudo_meas, mode
 	uS  = np.dot(Dnm,uDeltaS)
 
 	return Shat, Vhat, uS, DeltaS, uDeltaS
-
-#

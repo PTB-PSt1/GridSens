@@ -28,8 +28,7 @@ from matplotlib.pyplot import *
 from scipy.io import loadmat
 from NLO.dynamic_models import SimpleModel
 from NLO.nodal_load_observer import IteratedExtendedKalman
-# from NLO.nodal_load_observer import LinearKalmanFilter
-
+from NLO.nodal_load_observer import LinearKalmanFilter
 # load data
 topology = network.get_topology()
 S, Vs, V, Y, Sfc = network.measured_data()
@@ -57,13 +56,13 @@ Vhat0 = np.r_[basekV/(np.sqrt(3)*np.ones(nNodes)), np.zeros(nNodes)]
 n = 2*nNodes-nPMeas-nQMeas
 model = SimpleModel(n, alpha = 0.95, q=10)
 meas_idx = { "Pk": PMeasIdx, "Qk":  QMeasIdx, "Vm": VMeasIdx, "Va": VMeasIdx}
-meas = { "Pk": S[:nNodes,:][PMeasIdx,:], "Qk": S[nNodes:,:][QMeasIdx,:], "Vm": V[:nNodes,:][VMeasIdx,:], "Va": V[nNodes:,:][VMeasIdx,:]}
+meas = { "Pk": S[:nNodes,:][PMeasIdx,:], "Qk": S[nNodes:,:][QMeasIdx,:],"V": V, "Vm": V[:nNodes,:][VMeasIdx,:], "Va": V[nNodes:,:][VMeasIdx,:]}
 pseudo_meas = {"Pk": SNMeasFc[:n/2,:], "Qk": SNMeasFc[n/2:,:]}
 meas_unc = { "Vm": 1e-2*np.ones(nVMeas), "Va": 1e-2*np.ones(nVMeas) }
-
 Shat, Vhat, uShat, DeltaS, uDeltaS = IteratedExtendedKalman(topology, meas, meas_unc, meas_idx, pseudo_meas, model,Vhat0,Vs,Y=Y)
-# Shat, Vhat, uShat, DeltaS, uDeltaS = LinearKalmanFilter(topology, meas, meas_unc, meas_idx, pseudo_meas, model,Vhat0,Vs,Y=Y)
+#Shat, Vhat, uShat, DeltaS, uDeltaS = LinearKalmanFilter(topology, meas, meas_unc, meas_idx, pseudo_meas, model,Vhat0,Vs,Y=Y)
 #--------------------------------------
+
 
 Veff = np.sqrt( V[:nNodes,:]**2 + V[nNodes:,:]**2)
 Vhateff = np.sqrt(Vhat[:nNodes,:]**2 + Vhat[nNodes:,:]**2)

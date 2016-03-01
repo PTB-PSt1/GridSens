@@ -102,9 +102,9 @@ class AR2Model_single(DynamicModel):
 
 	def setA(self):
 		A11 = self.parameters["phi"][0]*np.eye(self.dim/2)
-		A12 = self.parameters["phi"][0]*np.eye(self.dim/2)
-		A21 = np.eye(self.dim/2)
-		A22 = np.zeros_like(A21)
+		A12 = self.parameters["phi"][1]*np.eye(self.dim/2)
+		A21 = 1*np.eye(self.dim/2)
+		A22 = 0*np.eye(self.dim/2)
 		self.A = np.vstack((np.hstack((A11,A12)),
 							np.hstack((A21,A22)))) # (2*(n_k-1),2*(n_k-1))
 
