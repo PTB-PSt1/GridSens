@@ -58,7 +58,7 @@ n = 2*nNodes-nPMeas-nQMeas
 model = SimpleModel(n, alpha = 0.95, q=10)
 meas_idx = { "Pk": PMeasIdx, "Qk":  QMeasIdx, "Vm": VMeasIdx, "Va": VMeasIdx}
 meas = { "Pk": S[:nNodes,:][PMeasIdx,:], "Qk": S[nNodes:,:][QMeasIdx,:], "Vm": V[:nNodes,:][VMeasIdx,:], "Va": V[nNodes:,:][VMeasIdx,:]}
-pseudo_meas = {"Pk": SNMeasFc[:n,:], "Qk": SNMeasFc[n:,:]}
+pseudo_meas = {"Pk": SNMeasFc[:n/2,:], "Qk": SNMeasFc[n/2:,:]}
 meas_unc = { "Vm": 1e-2*np.ones(nVMeas), "Va": 1e-2*np.ones(nVMeas) }
 
 Shat, Vhat, uShat, DeltaS, uDeltaS = IteratedExtendedKalman(topology, meas, meas_unc, meas_idx, pseudo_meas, model,Vhat0,Vs,Y=Y)
