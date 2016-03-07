@@ -31,12 +31,17 @@ from NLO.nodal_load_observer import IteratedExtendedKalman
 from NLO.nodal_load_observer import LinearKalmanFilter
 # load data
 topology = network.get_topology()
-S, Vs, V, Y, Sfc = network.measured_data()
+S, Vs_, V_, Y, Sfc = network.measured_data()
 
 nNodes = S.shape[0]/2
 nT = S.shape[1]
 t = np.arange(15,15*(nT+1),15)
 
+# transform voltages (real, imag) to amplitude and phase
+Vs = np.vstack((np.sqrt(Vs_[0,:]**2 + Vs_[1,:]**2),
+				np.arctan2(Vs_[1,:],Vs_[0,:])))
+V = np.vstack((np.sqrt(V_[:nNodes,:]**2 + V_[nNodes:,:]**2),
+			   np.arctan2(V_[nNodes:,:],V_[:nNodes,:])))
 # Forecasts
 if nPMeas == 0:
 	SNMeasFc = Sfc
@@ -56,11 +61,11 @@ Vhat0 = np.r_[basekV/(np.sqrt(3)*np.ones(nNodes)), np.zeros(nNodes)]
 n = 2*nNodes-nPMeas-nQMeas
 model = SimpleModel(n, alpha = 0.95, q=10)
 meas_idx = { "Pk": PMeasIdx, "Qk":  QMeasIdx, "Vm": VMeasIdx, "Va": VMeasIdx}
-meas = { "Pk": S[:nNodes,:][PMeasIdx,:], "Qk": S[nNodes:,:][QMeasIdx,:],"V": V, "Vm": V[:nNodes,:][VMeasIdx,:], "Va": V[nNodes:,:][VMeasIdx,:]}
+meas = { "Pk": S[:nNodes,:][PMeasIdx,:], "Qk": S[nNodes:,:][QMeasIdx,:], "Vm": V[:nNodes,:][VMeasIdx,:], "Va": V[nNodes:,:][VMeasIdx,:]}
 pseudo_meas = {"Pk": SNMeasFc[:n/2,:], "Qk": SNMeasFc[n/2:,:]}
 meas_unc = { "Vm": 1e-2*np.ones(nVMeas), "Va": 1e-2*np.ones(nVMeas) }
 Shat, Vhat, uShat, DeltaS, uDeltaS = IteratedExtendedKalman(topology, meas, meas_unc, meas_idx, pseudo_meas, model,Vhat0,Vs,Y=Y)
-#Shat, Vhat, uShat, DeltaS, uDeltaS = LinearKalmanFilter(topology, meas, meas_unc, meas_idx, pseudo_meas, model,Vhat0,Vs,Y=Y)
+# Shat, Vhat, uShat, DeltaS, uDeltaS = LinearKalmanFilter(topology, meas, meas_unc, meas_idx, pseudo_meas, model,Vhat0,Vs,Y=Y)
 #--------------------------------------
 
 

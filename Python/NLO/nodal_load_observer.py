@@ -123,11 +123,12 @@ def jacobian(Y00,Ys,V,Vs):
 
 
 def LinearKalmanFilter(topology, meas, meas_unc, meas_idx, pseudo_meas, model, V0,
-						   Vs, slack_idx=0, Y=None): #topology, meas, meas_unc, meas_idx, pseudo_meas, model, v0=11.55, slack_idx=0, Y=None, nK=None):
+						   Vs, slack_idx=0, Y=None):
 	"""
 	Quasi-Linear Kalman filter for the nodal load observer
 	This version of the NLO state estimation method ignores the nonlinearity for the calculation of the
 	Kalman gain and utilizes the fix point equation property for the calculation of voltages from powers.
+	Estimated nodal voltages are returned as real and imaginary parts
 
 	Real-valued matrices of complex-valued quantities are assumed to be structured as [ [real part], [imag part] ]
 	:param topology: dict containing information on bus, branch, ... in PyPower format
@@ -137,6 +138,7 @@ def LinearKalmanFilter(topology, meas, meas_unc, meas_idx, pseudo_meas, model, V
 	:param pseudo_meas: dict containing the corresponding pseudo-measurements
 	:param model: DynamicModel object as defined in dynamic_models.py
 	:param V0: initial estimate of nodal voltages (magnitude and phase)
+	:param Vs: voltages at slack node (magnitude and phase)
 	:param slack_idx: index of slack node
 	:param Y: (optional) user defined admittance matrix
 
@@ -154,23 +156,28 @@ def LinearKalmanFilter(topology, meas, meas_unc, meas_idx, pseudo_meas, model, V
 	vmeas = np.zeros(nK,dtype = bool); vmeas[meas_idx["Vm"]] = True
 	Cm,Dnm,Dm = get_system_matrices(pmeas,qmeas,vmeas)
 
-	Slack = np.linalg.solve(Yadm,np.dot(Y_slack,Vs))
-	y = np.r_[meas["Vm"], meas["Va"]] + np.dot(Cm,Slack)
+	# transform voltages at slack node to real and imaginary parts
+	Vs_ri = np.vstack((Vs[0,:]*np.cos(Vs[1,:]*np.pi/180),
+					   Vs[0,:]*np.sin(Vs[1,:]*np.pi/180)))
+	Slack = np.linalg.solve(Yadm,np.dot(Y_slack,Vs_ri))
+	# y = np.r_[meas["Vm"], meas["Va"]] + np.dot(Cm,Slack)
 
 	S = np.dot(Dm, np.r_[meas["Pk"], meas["Qk"]]) + np.dot(Dnm, np.r_[pseudo_meas["Pk"], pseudo_meas["Qk"]])
 
+	# adjust uncertainties in case that their dimension is wrong
 	if isinstance(meas_unc["Vm"],float):
 		meas_unc["Vm"] = meas_unc["Vm"]*np.ones_like(meas["Vm"])
+	elif len(meas_unc["Vm"].shape)==1:
+		meas_unc["Vm"] = np.tile(meas_unc["Vm"],(meas["Vm"].shape[1],1)).T
+
 	if isinstance(meas_unc["Va"],float):
 		meas_unc["Va"] = meas_unc["Va"]*np.ones_like(meas["Va"])
-
-	r = np.r_[meas_unc["Vm"]**2,
-			  meas_unc["Va"]**2]
-	R = np.diag(r)
+	elif len(meas_unc["Va"].shape)==1:
+		meas_unc["Va"] = np.tile(meas_unc["Va"],(meas["Va"].shape[1],1)).T
 
 	nx = model.dim
-	nm = y.shape[0]
-	t_f= y.shape[1]
+	nm = 2*meas["Vm"].shape[0]
+	t_f= meas["Vm"].shape[1]
 
 	def calcM(mu):
 		divisor = 3*(mu[:nK]**2 + mu[nK:]**2)
@@ -199,7 +206,7 @@ def LinearKalmanFilter(topology, meas, meas_unc, meas_idx, pseudo_meas, model, V
 
 # initialize solution matrices
 	V_est = np.zeros((2*nK,t_f+1))     # Estimated voltages
-	V_est[:nK,0] = V0[:nK]
+	V_est[:nK,0] = V0[:nK]*np.cos(V0[nK:])
 	x_est = np.zeros((nx,t_f+1))          # Estimated active and reactive powers
 	x_est[:,0] = model.forecast_state()
 	DeltaS_est = np.zeros((nx,t_f))     # Estimated power deviation
@@ -209,6 +216,10 @@ def LinearKalmanFilter(topology, meas, meas_unc, meas_idx, pseudo_meas, model, V
 #%% ########################### KALMAN ########################################
 	print '.',
 	for k in range(1,t_f+1):
+		# transform voltages to real and imaginary parts
+		yRe,yIm,R = amph_phase_to_real_imag(meas["Vm"][:,k-1],meas["Va"][:,k-1]*np.pi/180,
+											meas_unc["Vm"][:,k-1]**2,meas_unc["Va"][:,k-1]**2)
+		y = np.r_[yRe,yIm] + np.dot(Cm,Slack[:,k-1])
 	# preparation of state space system matrices
 		Ks = calcKs(V_est[:,k-1],x_est[:,k-1],k-1)
 		C = np.dot(Cm,np.dot(Ks,Dnm))
@@ -220,7 +231,7 @@ def LinearKalmanFilter(topology, meas, meas_unc, meas_idx, pseudo_meas, model, V
 	# Kalman gain matrix K
 		K =  np.linalg.solve(np.dot(C,np.dot(Pf,C.T)) + R, np.dot(C,P)).T
 	# corrected state estimate
-		x_est[:,k][:,np.newaxis] = xf + np.dot(K, y[:,k-1].reshape(nm,1)
+		x_est[:,k][:,np.newaxis] = xf + np.dot(K, y.reshape(nm,1)
 									  - (np.dot(C,xf) + np.dot(D,S[:,k-1].reshape(2*nK,1))) )
 	# corrected error covariance matrix
 		P = np.dot(np.eye(nx) - np.dot(K,C),Pf)
@@ -248,12 +259,12 @@ def IteratedExtendedKalman(topology, meas, meas_unc, meas_idx, pseudo_meas, mode
 
 	:param topology: dict containing information on bus, branch, ... in PyPower format
 	:param meas: dict containing measurements "Pk", "Qk", "Vm" and "Va"
-	:param meas_unc: dict containing associated uncertainties
+	:param meas_unc: dict containing uncertainties with the values in `meas'
 	:param meas_idx: dict containing the corresponding indices
 	:param pseudo_meas: dict containing the corresponding pseudo-measurements
 	:param model: DynamicModel object as defined in dynamic_models.py
 	:param V0: initial estimate of nodal voltages at all nodes except slack
-	:param Vs: voltage amplitude and phase at slack node
+	:param Vs: voltage amplitude and phase at slack node as (2,nT)-dimensional vector
 	:param slack_idx: index of slack node
 	:param Y: (optional) admittance matrix
 	:param accuracy: threshold for inner iteration of the iterated EKF
@@ -271,32 +282,31 @@ def IteratedExtendedKalman(topology, meas, meas_unc, meas_idx, pseudo_meas, mode
 	if not isinstance(Y,np.ndarray):
 		Y = makeYbus(topology["baseMVA"],topology["bus"],topology["branch"])
 	Y00, Ys = separate_Yslack(Y,slack_idx)
-	y0 = np.zeros((np.size(vmeas[meas_idx["Vm"]]),meas["V"].shape[1]))
-	y1 = np.zeros((np.size(vmeas[meas_idx["Vm"]]),meas["V"].shape[1]))
-	for k,ind in enumerate(vmeas.nonzero()[0]):
-	    y0[k,:] =  meas["V"][ind,:]
-	    y1[k,:] =  meas["V"][ind+n_K,:]
-	y = np.vstack((y0,y1))  
-	#y =np.r_[meas["Vm"], meas["Va"]] 
-
-	Slack = np.linalg.solve(Y00,np.dot(Ys,Vs))
+	# transform voltages at slack node to real and imaginary parts
+	Vs_ri = np.vstack((Vs[0,:]*np.cos(Vs[1,:]*np.pi/180),
+					   Vs[0,:]*np.sin(Vs[1,:]*np.pi/180)))
+	Slack = np.linalg.solve(Y00,np.dot(Ys,Vs_ri))
 	Sm = np.r_[meas["Pk"], meas["Qk"]]
 	Sfc = np.r_[pseudo_meas["Pk"], pseudo_meas["Qk"]]
 
 	u = np.dot(Dm,Sm) + np.dot(Dnm,Sfc)
+
+	# adjust uncertainties in case that their dimension is wrong
 	if isinstance(meas_unc["Vm"],float):
 		meas_unc["Vm"] = meas_unc["Vm"]*np.ones_like(meas["Vm"])
+	elif len(meas_unc["Vm"].shape)==1:
+		meas_unc["Vm"] = np.tile(meas_unc["Vm"],(meas["Vm"].shape[1],1)).T
+
 	if isinstance(meas_unc["Va"],float):
 		meas_unc["Va"] = meas_unc["Va"]*np.ones_like(meas["Va"])
-	r = np.r_[meas_unc["Vm"]**2,
-			  meas_unc["Va"]**2]
-	R = np.diag(r)
+	elif len(meas_unc["Va"].shape)==1:
+		meas_unc["Va"] = np.tile(meas_unc["Va"],(meas["Va"].shape[1],1)).T
 
 	def calcM(mu):
 		divisor = 3*(mu[:n_K]**2 + mu[n_K:]**2)
 		return np.r_[np.c_[np.diag(mu[:n_K]/divisor), np.diag(mu[n_K:]/divisor)],
 				     np.c_[np.diag(mu[n_K:]/divisor), -np.diag(mu[:n_K]/divisor)]]
-	nT = y.shape[1]
+	nT = Vs.shape[1]
 	xhat = np.zeros((n,nT))
 	Vhat = np.zeros((2*n_K,nT))
 	Shat = np.zeros((2*n_K,nT))
@@ -307,10 +317,14 @@ def IteratedExtendedKalman(topology, meas, meas_unc, meas_idx, pseudo_meas, mode
 	Dnm = model.adjust_Dnm(Dnm)
 
 	for k in range(nT):
+		# transform voltages to real and imaginary parts
+		yRe,yIm,R = amph_phase_to_real_imag(meas["Vm"][:,k],meas["Va"][:,k]*np.pi/180,meas_unc["Vm"][:,k]**2,meas_unc["Va"][:,k]**2)
+		y = np.r_[yRe,yIm]
 		if k==0:
 			xhatfc = model.forecast_state()
 			Pfilterfc = model.forecast_unc()
-			mu = V0
+			mu = np.hstack((V0[:n_K]*np.cos(V0[n_K:]),
+							V0[:n_K]*np.sin(V0[n_K:])))
 		else:
 			xhatfc = model.forecast_state(xhat[:,k-1])
 			Pfilterfc = model.forecast_unc(Pfilter)
@@ -320,21 +334,21 @@ def IteratedExtendedKalman(topology, meas, meas_unc, meas_idx, pseudo_meas, mode
 		j1 = 1
 		while (varstop1 > accuracy) and (j1 < maxiter):
 			M_U = calcM(mu)
-			muiter = np.linalg.solve(Y00,np.dot(M_U,u[:,k] + np.dot(Dnm,eta))) - Slack[:,k] #np.linalg.solve(Y00, np.dot(Ys, Vs[:,k]))
+			muiter = np.linalg.solve(Y00,np.dot(M_U,u[:,k] + np.dot(Dnm,eta))) - Slack[:,k]
 			varstop2 = 1
 			j2 = 1
 			while (varstop2 > accuracy) and (j2 < maxiter):
 				M_U = calcM(mu)
 				temp2 = muiter.copy()
-				muiter = np.linalg.solve(Y00,np.dot(M_U,u[:,k] + np.dot(Dnm,eta))) - np.linalg.solve(Y00, np.dot(Ys, Vs[:,k]))
+				muiter = np.linalg.solve(Y00,np.dot(M_U,u[:,k] + np.dot(Dnm,eta))) - Slack[:,k]
 				varstop2 = np.linalg.norm(muiter-temp2)
 				j2 += 1
 			mu = muiter
-			Dh = jacobian(Y00,Ys,mu,Vs[:,k])
+			Dh = jacobian(Y00,Ys,mu,Vs_ri[:,k])
 			H = np.dot(Cm, np.linalg.solve(Dh, Dnm))
 			K = np.dot(Pfilterfc, np.linalg.solve((np.dot(H,np.dot(Pfilterfc,H.T))+R).T,H).T)
 			temp1 = eta.copy()
-			eta = xhatfc + np.dot(K, y[:,k] - np.dot(Cm,mu) - np.dot(H, xhatfc-eta))
+			eta = xhatfc + np.dot(K, y - np.dot(Cm,mu) - np.dot(H, xhatfc-eta))
 			varstop1 = np.linalg.norm(temp1-eta)
 			j1 += 1
 		# Data assimilation step
@@ -348,3 +362,43 @@ def IteratedExtendedKalman(topology, meas, meas_unc, meas_idx, pseudo_meas, mode
 	uS  = np.dot(Dnm,uDeltaS)
 
 	return Shat, Vhat, uS, DeltaS, uDeltaS
+
+def amph_phase_to_real_imag(A,P,Ua,Up):
+	"""
+	Transforms uncertainties associated with amplitude A and phase P to the corresponding real and imaginary parts
+	including the evaluation of associated standard uncertainties (ignoring correlations).
+
+	For more details see
+		Eichstädt, S. and Wilkens, V. "GUM2DFT – A software tool for uncertainty evaluation of transient signals in the frequency domain"
+		Metrologia 2016
+
+	:param A: ndarray of amplitude values; shape (N,)
+	:param P: ndarray of phase values in radians; shape (N,)
+	:param UAP: ndarray of uncertainties associated with A and P; shape (2xN,)
+	:return: Re, Im, URI
+	"""
+	from scipy import sparse
+
+	assert(len(A.shape)==1)
+	assert(A.shape==P.shape)
+	assert(Ua.shape==A.shape)
+	assert(Up.shape==P.shape)
+	# calculation of F
+	Re = A*np.cos(P)
+	Im = A*np.sin(P)
+
+	# calculation of sensitivities
+	CRA = np.cos(P)
+	CRP = -A*np.sin(P)
+	CIA = np.sin(P)
+	CIP = A*np.cos(P)
+
+	# assignment of uncertainty blocks in UAP
+	N = len(A)
+
+	U11 = CRA*Ua*CRA + CRP*Up*CRP
+	U12 = CRA*Ua*CIA + CRP*Up*CIP
+	U22 = CIA*Ua*CIA + CIP*Up*CIP
+	URI = sparse.diags([np.r_[U11,U22],U12,U12],[0,N,-N]).toarray()
+	return Re, Im, URI
+
