@@ -68,9 +68,10 @@ Vhat0 = np.r_[basekV/(np.sqrt(3)*np.ones(nNodes)), np.zeros(nNodes)]
 n = 2*nNodes-nPMeas-nQMeas
 model = SimpleModel(n, alpha = 0.95, q=10)
 meas_idx = { "Pk": PMeasIdx, "Qk":  QMeasIdx, "Vm": VMeasIdx, "Va": VMeasIdx}
-simdata = network.simulate_data(S, gen=LoadP/(baseMVA*1000), PVdata=PVdata[:,14]/1000,PV_idx=6, verbose = 0)
-meas = { "Pk": simdata['Pk'][PMeasIdx,:], "Qk": simdata['Qk'][QMeasIdx,:], "V": V,"Vm": simdata['V'][VMeasIdx,:], "Va": simdata['Va'][VMeasIdx,:]}
-pseudo_meas=network.create_pseudomeas(simdata,meas_idx,PVdata=PVdata[:,14]/1000,PV_idx=6)
+simdata = network.simulate_data(S, gen=LoadP/(baseMVA*1000), PVdata=-PVdata[:,14]/1000,PV_idx=6, verbose = 0)
+meas = { "Pk": simdata['Pk'][PMeasIdx,:], "Qk": simdata['Qk'][QMeasIdx,:], "Vm": simdata['Vm'][2:,:][VMeasIdx,:], "Va": simdata['Va'][2:,:][VMeasIdx,:]}
+Vs = np.vstack((simdata['Vm'][1,:],simdata['Va'][1,:]))
+pseudo_meas=network.create_pseudomeas(simdata,meas_idx,PVdata=-PVdata[:,14]/1000,PV_idx=6)
 meas_unc = { "Vm": 1e-2*np.ones(nVMeas), "Va": 1e-2*np.ones(nVMeas) }
 Shat, Vhat, uShat, DeltaS, uDeltaS = IteratedExtendedKalman(topology, meas, meas_unc, meas_idx, pseudo_meas, model,Vhat0,Vs,Y=Y)
 
@@ -84,8 +85,8 @@ figure(1,figsize = (18,10));clf()
 suptitle("Active power", fontsize=20, fontweight='bold')
 for i in range(nNodes):
 	subplot(3,4,i+1)
-	plot(t, -1000*simdata['Pk'][i,:],'o-c',linewidth=2.5,label="reference")
-	plot(t, -1000*Shat[i,:],'D-m',linewidth=2.5,label="estimate")
+	plot(t, 1000*simdata['Pk'][i,:],'o-c',linewidth=2.5,label="reference")
+	plot(t, 1000*Shat[i,:],'D-m',linewidth=2.5,label="estimate")
 	plot(t, -1000*Sfc[i,:],'x-k',linewidth=2.5,label="forecast")
 	if i in PMeasIdx:
 		title("bus %d (measured)"%i, fontsize=20, fontweight='bold')
