@@ -218,8 +218,7 @@ def LinearKalmanFilter(topology, meas, meas_unc, meas_idx, pseudo_meas, model, V
 	print '.',
 	for k in range(1,t_f+1):
 		# transform voltages to real and imaginary parts
-		yRe,yIm,R = amph_phase_to_real_imag(meas["Vm"][:,k-1],meas["Va"][:,k-1],
-											meas_unc["Vm"][:,k-1]**2,meas_unc["Va"][:,k-1]**2)
+		yRe,yIm,R = amph_phase_to_real_imag(meas["Vm"][:,k-1],np.radians(meas["Va"][:,k-1]),meas_unc["Vm"][:,k-1]**2,meas_unc["Va"][:,k-1]**2)
 		y = np.r_[yRe,yIm] + np.dot(Cm,Slack[:,k-1])
 	# preparation of state space system matrices
 		Ks = calcKs(V_est[:,k-1],x_est[:,k-1],k-1)

@@ -132,10 +132,10 @@ def simulate_data(Sm, gen=None, PVdata=None, PV_idx=None, verbose = 0):
 		if len(PVdata.shape)==2:   # P and Q for PVgen
 			if not PVdata.shape[0]==2:
 				PVdata = PVdata.T
-			Pdata[PV_idx,:] = PVdata[0,:]-Pdata[PV_idx,:]
-			Qdata[PV_idx,:] = PVdata[1,:]-Qdata[PV_idx,:]
+			Pdata[PV_idx,:] = -PVdata[0,:]+Pdata[PV_idx,:]
+			Qdata[PV_idx,:] = -PVdata[1,:]+Qdata[PV_idx,:]
 		else:
-			Pdata[PV_idx,:] = PVdata[:] -Pdata[PV_idx,:]# with MVA
+			Pdata[PV_idx,:] = -PVdata[:] +Pdata[PV_idx,:]# with MVA
 			Qdata[PV_idx,:] = np.zeros_like(PVdata)
 
         
@@ -165,10 +165,10 @@ def simulate_data(Sm, gen=None, PVdata=None, PV_idx=None, verbose = 0):
 	Q[4,:] = Q[4,:]
  
 	simdata = dict([])
-	simdata["V"] = (11/(np.sqrt(3)))*np.vstack((v_mag[2:,:]*np.cos(np.radians(v_ang[2:,:])),v_mag[2:,:]*np.sin(np.radians(v_ang[2:,:])))) 
+	simdata["Vm"] = (11/(np.sqrt(3)))*v_mag
 	simdata["Va"] = v_ang
-	simdata["Pk"] = loadP[2:,:]
-	simdata["Qk"] = loadQ[2:,:]
+	simdata["Pk"] = -loadP[2:,:]
+	simdata["Qk"] = -loadQ[2:,:]
 	simdata["P_00"]=P_into_00
  	simdata["Q_00"]=Q_into_00
 	return simdata
