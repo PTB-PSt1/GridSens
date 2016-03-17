@@ -282,6 +282,7 @@ def IteratedExtendedKalman(topology, meas, meas_unc, meas_idx, pseudo_meas, mode
 	if not isinstance(Y,np.ndarray):
 		Y = makeYbus(topology["baseMVA"],topology["bus"],topology["branch"])
 	Y00, Ys = separate_Yslack(Y,slack_idx)
+
 	# transform voltages at slack node to real and imaginary parts
 	Vs_ri = np.vstack((Vs[0,:]*np.cos(np.radians(Vs[1,:])),
 					   Vs[0,:]*np.sin(np.radians(Vs[1,:]))))
@@ -335,6 +336,7 @@ def IteratedExtendedKalman(topology, meas, meas_unc, meas_idx, pseudo_meas, mode
 		while (varstop1 > accuracy) and (j1 < maxiter):
 			M_U = calcM(mu)
 			muiter = np.linalg.solve(Y00,np.dot(M_U,u[:,k] + np.dot(Dnm,eta))) - Slack[:,k]
+           
 			varstop2 = 1
 			j2 = 1
 			while (varstop2 > accuracy) and (j2 < maxiter):

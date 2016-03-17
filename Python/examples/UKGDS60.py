@@ -161,8 +161,6 @@ def simulate_data(Sm, gen=None, PVdata=None, PV_idx=None, verbose = 0):
 		P_into_00[n]=-resultPF['branch'][0,15]
 		Q_into_00[n]=-resultPF['branch'][0,16]
 
-	P[4,:] = P[4,:]
-	Q[4,:] = Q[4,:]
  
 	simdata = dict([])
 	simdata["Vm"] = (11/(np.sqrt(3)))*v_mag
@@ -175,26 +173,26 @@ def simulate_data(Sm, gen=None, PVdata=None, PV_idx=None, verbose = 0):
  
 
 
-def create_pseudomeas(simdata,meas_idx,PVdata=None,PV_idx=None):
+def create_pseudomeas(simdata,meas_idx,PVdataSim=None,PV_idx=None):
 	"""Using the power injected at bus 0 (301) and some PV data (simulated),
 	pseudo-measurements are created for all nodes at which no measurement
 	is assumed available
 	"""
 	from numpy import matlib
 	n_K = simdata["Pk"].shape[0]
-	Pfc = simdata["P_00"]/11 + simdata["Pk"][0,0]/11
-	Qfc = simdata["Q_00"]/11 + simdata["Qk"][0,0]/11
+	Pfc = -simdata["P_00"]/11 - simdata["Pk"][0,0]/11
+	Qfc = -simdata["Q_00"]/11 - simdata["Qk"][0,0]/11
 	full_Pf = matlib.repmat(Pfc,n_K,1)
 	full_Qf = matlib.repmat(Qfc,n_K,1)
-	if isinstance(PVdata,np.ndarray):
-		if len(PVdata.shape)==2:   # P and Q for PVgen
-			if not PVdata.shape[0]==2:
-				PVdata = PVdata.T
-			full_Pf[PV_idx,:] =PVdata[0,:]
-			full_Qf[PV_idx,:] =PVdata[1,:]
+	if isinstance(PVdataSim,np.ndarray):
+		if len(PVdataSim.shape)==2:   # P and Q for PVgen
+			if not PVdataSim.shape[0]==2:
+				PVdataSim = PVdataSim.T
+			full_Pf[PV_idx,:] =PVdataSim[0,:]
+			full_Qf[PV_idx,:] =PVdataSim[1,:]
 		else:
-			full_Pf[PV_idx,:] =PVdata[:]
-			full_Qf[PV_idx,:] = np.zeros_like(PVdata)
+			full_Pf[PV_idx,:] =PVdataSim[:]
+			full_Qf[PV_idx,:] = np.zeros_like(PVdataSim)
 	pseudo_meas = dict([])
 	pseudo_meas["Pk"] = np.delete(full_Pf,meas_idx["Pk"],0)
 	pseudo_meas["Qk"] = np.delete(full_Qf,meas_idx["Qk"],0)
