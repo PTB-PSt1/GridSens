@@ -1,6 +1,6 @@
 # GridSens
 
-This software is part of the joint EMRP project ENG63 GridSens. Project information under [gridsens.eu](gridsens.eu) or at [MATHMET](mathmet.org/projects/ENG63).
+This software is part of the joint EMRP project ENG63 GridSens. Project information under [gridsens.eu](http://gridsens.eu) or at [MATHMET](http://mathmet.org/projects/ENG63).
 
 ### Installation
 Since this software is still under active development, we highly recommend to **not** download the zip-file of the current version only. Instead, we recommend using [Github Desktop](https://desktop.github.com) or any other git-compatible version control software and cloning the repository (https://github.com/eichstaedtPTB/GridSens.git). In this way, any updates to the software will be highlighted in the version control software and can be applied very easily. Of course, you may also *fork* the repository and suggest your changes as pull requests.
