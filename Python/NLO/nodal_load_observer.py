@@ -272,7 +272,8 @@ def IteratedExtendedKalman(topology, meas, meas_unc, meas_idx, pseudo_meas, mode
 
 	:return: Shat, Vhat, uShat, DeltaS, uDeltaS
 	"""
-
+	if issparse(Y):
+		Y = Y.toarray()
 	n = model.dim
 	n_K = len(V0)/2
 	pmeas = np.zeros(n_K,dtype = bool); pmeas[meas_idx["Pk"]] = True
