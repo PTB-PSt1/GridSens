@@ -21,3 +21,4 @@ In no event will PTB be liable for any direct, indirect or consequential damage 
 ### Acknowledgement
 This work is part of the European Metrology Research Program (EMRP) Joint Research Project ENG63. The EMRP is jointly funded by the EMRP participating countries within EURAMET and the European Union.
 
+We would like to thank Wiebke Heins (TU Clausthal, Germany) for making available to the authors the initial version of the nodal load observer code in MATLAB.
