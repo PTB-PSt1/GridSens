@@ -69,7 +69,7 @@ simdata = network.simulate_data(S, gen=LoadP/(baseMVA*1000), PVdata=PVdata[:,14]
 meas = { "Pk": simdata['Pk'][PMeasIdx,:], "Qk": simdata['Qk'][QMeasIdx,:], "Vm": simdata['Vm'][2:,:][VMeasIdx,:], "Va": simdata['Va'][2:,:][VMeasIdx,:]}
 Vs = np.vstack((simdata['Vm'][1,:],simdata['Va'][1,:]))
 pseudo_meas=network.create_pseudomeas(simdata,meas_idx,PVdataSim=FittedPV[:],PV_idx=6)
-meas_unc = { "Vm": 1e-2*np.ones(nVMeas), "Va": 1e-2*np.ones(nVMeas) }
+meas_unc = { "Vm": 1e-4*np.ones(nVMeas), "Va": 1e-4*np.ones(nVMeas) }
 Shat, Vhat, uShat, DeltaS, uDeltaS = IteratedExtendedKalman(topology, meas, meas_unc, meas_idx, pseudo_meas, model,Vhat0,Vs,Y=Yws)
 
 model = SimpleModel(n, alpha = 0.95, q=10)
@@ -78,9 +78,11 @@ simdata = network.simulate_data(S, gen=LoadP/(baseMVA*1000), PVdata=PVdata[:,14]
 meas = { "Pk": simdata['Pk'][PMeasIdx,:], "Qk": simdata['Qk'][QMeasIdx,:], "Vm": simdata['Vm'][2:,:][VMeasIdx,:], "Va": simdata['Va'][2:,:][VMeasIdx,:]}
 Vs = np.vstack((simdata['Vm'][1,:],simdata['Va'][1,:]))
 pseudo_meas=network.create_pseudomeas(simdata,meas_idx,PVdataSim=FittedPV[:],PV_idx=6)
-meas_unc = { "Vm": 1e-2*np.ones(nVMeas), "Va": 1e-2*np.ones(nVMeas) }
+meas_unc = { "Vm": 1e-4*np.ones(nVMeas), "Va": 1e-4*np.ones(nVMeas) }
 Shat1, Vhat1, uShat1, DeltaS1, uDeltaS1 = IteratedExtendedKalman(topology, meas, meas_unc, meas_idx, pseudo_meas, model,Vhat0,Vs,Y=Yws)
 ##---------------------------------
+
+
 
 NonMeasIdx = list(set(range(nNodes)) - set(PMeasIdx))
 figure(4); clf()    # active power
