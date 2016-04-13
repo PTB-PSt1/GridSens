@@ -27,7 +27,7 @@ import UKGDS60 as network
 from matplotlib.pyplot import *
 from scipy.io import loadmat
 from NLO.dynamic_models import SimpleModel
-from NLO.nodal_load_observer import IteratedExtendedKalman
+from NLO.nodal_load_observer import IteratedExtendedKalman, IteratedExtendedKalman_extended
 from NLO.nodal_load_observer import LinearKalmanFilter
 # load data
 topology = network.get_topology()
@@ -59,7 +59,8 @@ meas_idx = { "Pk": PMeasIdx, "Qk":  QMeasIdx, "Vm": VMeasIdx, "Va": VMeasIdx}
 meas = { "Pk": S[:nNodes,:][PMeasIdx,:], "Qk": S[nNodes:,:][QMeasIdx,:],"V": V, "Vm": V[:nNodes,:][VMeasIdx,:], "Va": V[nNodes:,:][VMeasIdx,:]}
 pseudo_meas = {"Pk": SNMeasFc[:n/2,:], "Qk": SNMeasFc[n/2:,:]}
 meas_unc = { "Vm": 1e-2*np.ones(nVMeas), "Va": 1e-2*np.ones(nVMeas) }
-Shat, Vhat, uShat, DeltaS, uDeltaS = IteratedExtendedKalman(topology, meas, meas_unc, meas_idx, pseudo_meas, model,Vhat0,Vs,Y=Y)
+# Shat, Vhat, uShat, DeltaS, uDeltaS = IteratedExtendedKalman(topology, meas, meas_unc, meas_idx, pseudo_meas, model,Vhat0,Vs,Y=Y)
+Shat, Vhat, uShat, DeltaS, uDeltaS = IteratedExtendedKalman_extended(topology, meas, meas_unc, meas_idx, pseudo_meas, model,Vhat0,Vs,Y=Y)
 #Shat, Vhat, uShat, DeltaS, uDeltaS = LinearKalmanFilter(topology, meas, meas_unc, meas_idx, pseudo_meas, model,Vhat0,Vs,Y=Y)
 #--------------------------------------
 
@@ -116,4 +117,4 @@ for i in range(nNodes):
 	title("bus %d"%i)
 subplots_adjust(left=0.05,right=0.98,top=0.95,bottom=0.05)
 
-show()
+# show()
