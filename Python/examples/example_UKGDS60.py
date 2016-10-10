@@ -121,4 +121,4 @@ for i in range(nNodes):
 	title("bus %d"%i)
 subplots_adjust(left=0.05,right=0.98,top=0.95,bottom=0.05)
 
-show()
+# show()
