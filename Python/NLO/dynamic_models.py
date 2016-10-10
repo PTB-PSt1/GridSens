@@ -107,7 +107,7 @@ class AR2Model_single(DynamicModel):
 		A22 = 0*np.eye(self.dim/2)
 		self.A = np.vstack((np.hstack((A11,A12)),
 							np.hstack((A21,A22)))) # (2*(n_k-1),2*(n_k-1))
-
+		
 	def fit_model(self, data):
 		arma_mod20 = sm.tsa.ARMA(data, (2,0)).fit()
 		self.parameters["constant"] = arma_mod20.params[0]

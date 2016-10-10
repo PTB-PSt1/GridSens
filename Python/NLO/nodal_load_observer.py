@@ -15,7 +15,7 @@ from scipy.sparse import issparse
 if __name__=="NLO.nodal_load_observer": # module is imported from within package
 	from tools.data_tools import process_admittance, separate_Yslack, makeYbus
 else:
-	from ..tools.data_tools import process_admittance, separate_Yslack, makeYbus
+	from tools.data_tools import process_admittance, separate_Yslack, makeYbus
 
 
 def get_system_matrices(pmeas,qmeas,vmeas):
@@ -58,7 +58,6 @@ def get_system_matrices(pmeas,qmeas,vmeas):
 		Dnm[ind,k] = 1
 	for k,ind in enumerate(qnmeas.nonzero()[0]):
 		Dnm[n_K+ind,pnm+k] = 1
-
 	return Cm, Dnm, Dm
 
 
@@ -252,7 +251,7 @@ def LinearKalmanFilter(topology, meas, meas_unc, meas_idx, pseudo_meas, model, V
 
 
 def IteratedExtendedKalman(topology, meas, meas_unc, meas_idx, pseudo_meas, model, V0,
-						   Vs,slack_idx=0, Y=None, accuracy=1e-9, maxiter=5):
+						   Vs,slack_idx=0, Y=None, accuracy=1e-9, maxiter=50):
 	"""
 	Iterated Extended Kalman filter for the nodal load observer
 	Real-valued matrices of complex-valued quantities are assumed to be structured as [ [real part], [imag part] ]
@@ -290,8 +289,8 @@ def IteratedExtendedKalman(topology, meas, meas_unc, meas_idx, pseudo_meas, mode
 	Slack = np.linalg.solve(Y00,np.dot(Ys,Vs_ri))
 	Sm = np.r_[meas["Pk"], meas["Qk"]]
 	Sfc = np.r_[pseudo_meas["Pk"], pseudo_meas["Qk"]]
-
 	u = np.dot(Dm,Sm) + np.dot(Dnm,Sfc)
+ 	#np.savetxt("/Users/makara01/Documents/oioi/Sm.out", u)
 
 	# adjust uncertainties in case that their dimension is wrong
 	if isinstance(meas_unc["Vm"],float):
@@ -315,12 +314,12 @@ def IteratedExtendedKalman(topology, meas, meas_unc, meas_idx, pseudo_meas, mode
 	DeltaS = np.zeros_like(xhat)
 	uDeltaS= np.zeros_like(xhat)
 	Pfilter = model.forecast_unc()
-
 	Dnm = model.adjust_Dnm(Dnm)
 
 	for k in range(nT):
 		# transform voltages to real and imaginary parts
 		yRe,yIm,R = amph_phase_to_real_imag(meas["Vm"][:,k],np.radians(meas["Va"][:,k]),meas_unc["Vm"][:,k]**2,meas_unc["Va"][:,k]**2)
+		
 		y = np.r_[yRe,yIm]
 		if k==0:
 			xhatfc = model.forecast_state()
@@ -336,21 +335,21 @@ def IteratedExtendedKalman(topology, meas, meas_unc, meas_idx, pseudo_meas, mode
 		j1 = 1
 		while (varstop1 > accuracy) and (j1 < maxiter):
 			M_U = calcM(mu)
-			muiter = np.linalg.solve(Y00,np.dot(M_U,u[:,k] + np.dot(Dnm,eta))) - Slack[:,k]
+			muiter = np.dot(np.dot(np.linalg.inv(Y00),M_U),u[:,k] + np.dot(Dnm,eta)) - Slack[:,k] 
            
 			varstop2 = 1
 			j2 = 1
 			while (varstop2 > accuracy) and (j2 < maxiter):
-				M_U = calcM(mu)
-				temp2 = muiter.copy()
-				muiter = np.linalg.solve(Y00,np.dot(M_U,u[:,k] + np.dot(Dnm,eta))) - Slack[:,k]
+				M_U = calcM(muiter)
+				temp2 = muiter
+				muiter = np.dot(np.dot(np.linalg.inv(Y00),M_U),u[:,k] + np.dot(Dnm,eta)) - Slack[:,k]
 				varstop2 = np.linalg.norm(muiter-temp2)
 				j2 += 1
 			mu = muiter
 			Dh = jacobian(Y00,Ys,mu,Vs_ri[:,k])
-			H = np.dot(Cm, np.linalg.solve(Dh, Dnm))
-			K = np.dot(Pfilterfc, np.linalg.solve((np.dot(H,np.dot(Pfilterfc,H.T))+R).T,H).T)
-			temp1 = eta.copy()
+			H = np.dot(Cm, np.dot(np.linalg.inv(Dh), Dnm))
+			K = np.dot(np.dot(Pfilterfc,H.T), np.linalg.pinv(np.dot(H,np.dot(Pfilterfc,H.T))+R))
+			temp1 = eta
 			eta = xhatfc + np.dot(K, y - np.dot(Cm,mu) - np.dot(H, xhatfc-eta))
 			varstop1 = np.linalg.norm(temp1-eta)
 			j1 += 1
@@ -361,9 +360,8 @@ def IteratedExtendedKalman(topology, meas, meas_unc, meas_idx, pseudo_meas, mode
 		Vhat[:,k] = mu
 		DeltaS[:,k-1] = xhat[:,k]
 		uDeltaS[:,k-1] = np.sqrt(np.diag(Pfilter))
-
+	
 	uS  = np.dot(Dnm,uDeltaS)
-
 	return Shat, Vhat, uS, DeltaS, uDeltaS
 
 def amph_phase_to_real_imag(A,P,Ua,Up):
@@ -388,7 +386,6 @@ def amph_phase_to_real_imag(A,P,Ua,Up):
 	# calculation of F
 	Re = A*np.cos(P)
 	Im = A*np.sin(P)
-
 	# calculation of sensitivities
 	CRA = np.cos(P)
 	CRP = -A*np.sin(P)

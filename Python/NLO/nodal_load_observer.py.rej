@@ -1,0 +1,6 @@
+diff a/Python/NLO/nodal_load_observer.py b/Python/NLO/nodal_load_observer.py	(rejected hunks)
+@@ -2,3 +3,4 @@
++
+ # -*- coding: utf-8 -*-
+ """
+ This module contains different state estimation approaches related to the Kalman filter.

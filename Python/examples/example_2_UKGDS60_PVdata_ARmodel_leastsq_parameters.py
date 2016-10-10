@@ -118,3 +118,19 @@ subplots_adjust(left=0.05,right=0.98)
 
 
 
+figure(2); clf()    # active power
+for i in range(nNodes):
+    subplot(3,4,i+1)
+    if i in PMeasIdx:
+		title("bus %d (measured)"%i, fontweight='bold')
+    else:
+		title("bus %d"%i, fontweight='bold')
+  		plot(t, np.abs(-S[i,:]-Shat1[i,:]),'k-v',linewidth=3.5,label="simple model",ms=5)
+		plot(t, np.abs(-S[i,:]-locals()["Shat_"+str(NonMeasIdx.index(i))][NonMeasIdx.index(i),:]),'c-o',linewidth=3.5,label="AR model")
+    legend(loc="upper right")
+    ylabel('Active power [MW]', fontsize=20, fontweight='bold')
+    xticks(np.linspace(0,nT*15,13), ['00:00', '02:00', '04:00', '06:00', '08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00', '22:00', '24:00'], fontsize = 12, fontweight='bold')
+    xticks(rotation=45)
+    yticks(fontweight='bold')
+    grid()
+subplots_adjust(left=0.05,right=0.98)

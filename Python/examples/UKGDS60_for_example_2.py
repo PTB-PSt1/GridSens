@@ -159,7 +159,6 @@ def simulate_data(Sm, gen=None, PVdata=None, PV_idx=None, verbose = 0):
 
 	loadP[6,:] = loadP[6,:]+genP_all[1,:]
 	loadQ[6,:] = loadQ[6,:]+genQ_all[1,:] 
-	
 	simdata = dict([])
 	simdata["Vm"] = (11/(np.sqrt(3)))*v_mag
 	simdata["Va"] = v_ang
@@ -170,7 +169,7 @@ def simulate_data(Sm, gen=None, PVdata=None, PV_idx=None, verbose = 0):
 	return simdata
  
 
-    
+
 
 def create_pseudomeas(simdata,meas_idx,PVdataSim=None,PV_idx=None):
 	"""Using the power injected at bus 0 (301) and some PV data (simulated),
@@ -179,8 +178,8 @@ def create_pseudomeas(simdata,meas_idx,PVdataSim=None,PV_idx=None):
 	"""
 	from numpy import matlib
 	n_K = simdata["Pk"].shape[0]
-	Pfc = -simdata["P_00"]/11 - simdata["Pk"][0,0]/11
-	Qfc = -simdata["Q_00"]/11 - simdata["Qk"][0,0]/11
+	Pfc = -simdata["P_00"]/11 #- simdata["Pk"][0,0]/11
+	Qfc = -simdata["Q_00"]/11# - simdata["Qk"][0,0]/11
 	full_Pf = matlib.repmat(Pfc,n_K,1)
 	full_Qf = matlib.repmat(Qfc,n_K,1)
 	if isinstance(PVdataSim,np.ndarray):

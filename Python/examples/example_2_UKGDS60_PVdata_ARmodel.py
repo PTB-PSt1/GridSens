@@ -86,14 +86,14 @@ Shat1, Vhat1, uShat1, DeltaS1, uDeltaS1 = IteratedExtendedKalman(topology, meas,
 
 NonMeasIdx = list(set(range(nNodes)) - set(PMeasIdx))
 figure(4); clf()    # active power
-ylabel('Active power [MW]', fontsize=20, fontweight='bold')
-plot(t, S[8,:],'b-D',linewidth=2.5,label="true value")
-plot(t, -Shat[8,:],'c-o',linewidth=2.5,label="AR model")
-plot(t, -Shat1[8,:],'k-v',linewidth=2.5,label="simple model",ms=5)
-plot(t, -pseudo_meas['Pk'][NonMeasIdx.index(8),:],'m-',linewidth=4.5,label="pseudo-measurements",alpha=0.5)   
+ylabel('Active power [MW]', fontsize=30, fontweight='bold')
+plot(t, S[8,:],'b-D',linewidth=3.5,label="true value")
+plot(t, -Shat[8,:],'c-o',linewidth=3.5,label="AR model")
+plot(t, -Shat1[8,:],'k-v',linewidth=3.5,label="simple model",ms=5)
+plot(t, -pseudo_meas['Pk'][NonMeasIdx.index(8),:],'m-',linewidth=5.5,label="pseudo-measurements",alpha=0.5)   
 legend(loc="upper right")
-xticks(np.linspace(0,nT*15,13), ['00:00', '02:00', '04:00', '06:00', '08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00', '22:00', '24:00'], fontsize = 12, fontweight='bold')
+xticks(np.linspace(0,nT*15,13), ['00:00', '02:00', '04:00', '06:00', '08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00', '22:00', '24:00'], fontsize = 19, fontweight='bold')
 xticks(rotation=45)
-yticks(fontweight='bold')
+yticks(fontweight='bold', fontsize = 19)
 grid()
 
