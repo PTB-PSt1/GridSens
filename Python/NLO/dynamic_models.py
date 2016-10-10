@@ -88,6 +88,7 @@ class AR2Model_single(DynamicModel):
 			self.parameters["phi"] = np.r_[phi1,phi2]
 			self.setA()
 		if isinstance(noise,float):
+			self.parameters["noise"] = noise
 			self.setQ(noise)
 
 	def adjust_Dnm(self, Dnm):

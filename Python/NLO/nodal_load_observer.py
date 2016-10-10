@@ -118,64 +118,7 @@ def jacobian(Y00,Ys,V,Vs):
 	return Dh
 
 
-def jacobian_dSdV(Y, nK):
-	# Set up equations of power flow (bus power from nodal voltage) as symbolic equations and
-	# calculate the corresponding Jacobian matrix.
-	from sympy import symbols, Matrix
 
-	G = Matrix(np.real(Y))
-	B = Matrix(np.imag(Y))
-
-	e_J = symbols("e1:%d"%(nK+1))
-	f_J = symbols("f1:%d"%(nK+1))
-
-	hSK = []
-	for i in range(nK):
-		hSK.append(e_J[i]*(G[i,:].dot(e_J) - B[i,:].dot(f_J)) + f_J[i]*(G[i,:].dot(f_J) + B[i,:].dot(e_J)))
-	for i in range(nK):
-		hSK.append(f_J[i]*(G[i,:].dot(e_J) - B[i,:].dot(f_J)) - e_J[i]*(G[i,:].dot(f_J) + B[i,:].dot(e_J)))
-	hSK = Matrix(hSK)
-	ef_J = e_J[1:] + f_J[1:]
-
-	Jac_equ = hSK.jacobian(ef_J)
-
-	return Jac_equ, hSK
-
-
-def jacobian_dHdV(nK, y, cap, inds):
-	# Set up equations of power flow (power at line from nodal voltage) as symbolic equations and
-	# calculate the corresponding Jacobian matrix.
-	from sympy import symbols, Matrix
-
-	g = Matrix(np.real(y))
-	b = Matrix(np.imag(y))
-
-	e_J = symbols("e1:%d"%(nK+1))
-	f_J = symbols("f1:%d"%(nK+1))
-	hSluV = []
-
-	if "Pl" in inds:
-		nPl = np.asarray(inds["Pl"]).astype(int)
-		for k in range(nPl.shape[0]):
-			i,j = nPl[k,:]
-			hSluV.append((e_J[i]**2+f_J[i]**2)*g[i,j]-(e_J[i]*e_J[j]+f_J[i]*f_J[j])*g[i,j]+(e_J[i]*f_J[j]-e_J[j]*f_J[i])*b[i,j])
-	if "Ql" in inds:
-		nQl = np.asarray(inds["Ql"]).astype(int)
-		for k in range(nQl.shape[0]):
-			i,j = nQl[k,:]
-			hSluV.append(-(e_J[i]**2+f_J[i]**2)*b[i,j]+(e_J[i]*e_J[j]+f_J[i]*f_J[j])*b[i,j]+(e_J[i]*f_J[j]-e_J[j]*f_J[i])*g[i,j]-(e_J[i]**2+f_J[i]**2)*cap[i,j]/2)
-	if "Vm" in inds:
-		nVk = np.asarray(inds["Vm"]).astype(int)
-		for k in range(nVk.shape[0]):
-			i = nVk[k]
-			hSluV.append((e_J[i]**2+f_J[i]**2)**0.5)
-	if len(hSluV)>0:
-		hSluV = Matrix(hSluV)
-		ef_J = e_J[1:] + f_J[1:]
-		JMatrix_dHdV = hSluV.jacobian(ef_J)
-		return JMatrix_dHdV, hSluV
-	else:
-		return None, None
 
 
 
@@ -364,6 +307,7 @@ def IteratedExtendedKalman(topology, meas, meas_unc, meas_idx, pseudo_meas, mode
 		divisor = 3*(mu[:n_K]**2 + mu[n_K:]**2)
 		return np.r_[np.c_[np.diag(mu[:n_K]/divisor), np.diag(mu[n_K:]/divisor)],
 				     np.c_[np.diag(mu[n_K:]/divisor), -np.diag(mu[:n_K]/divisor)]]
+         
 	nT = Vs.shape[1]
 	xhat = np.zeros((n,nT))
 	Vhat = np.zeros((2*n_K,nT))
@@ -372,7 +316,20 @@ def IteratedExtendedKalman(topology, meas, meas_unc, meas_idx, pseudo_meas, mode
 	uDeltaS= np.zeros_like(xhat)
 	Pfilter = model.forecast_unc()
 	Dnm = model.adjust_Dnm(Dnm)
-
+	phi0=np.tile(np.array([model.parameters["phi"][0],model.parameters["phi"][1]]), (n/2,1))
+	Beta=np.zeros((n/2,2,nT+1))
+	sigma = np.zeros((n/2,nT+1))
+	sigma_0 = model.parameters["noise"]* np.ones((n/2))
+   	la=np.zeros((nT+1))     
+	Psi = np.zeros((n/2,nT,2))
+	e=np.zeros((n/2,nT))
+	gamma =  np.zeros((n/2,nT+1))
+	F=np.eye(2) 
+	sigma[:,0]=sigma_0[:] # already squared
+	la[0] = 1.0
+	gamma[:,0] = np.ones((n/2))  
+     
+     
 	for k in range(nT):
 		# transform voltages to real and imaginary parts
 		yRe,yIm,R = amph_phase_to_real_imag(meas["Vm"][:,k],np.radians(meas["Va"][:,k]),meas_unc["Vm"][:,k]**2,meas_unc["Va"][:,k]**2)
@@ -381,12 +338,28 @@ def IteratedExtendedKalman(topology, meas, meas_unc, meas_idx, pseudo_meas, mode
 		if k==0:
 			xhatfc = model.forecast_state()
 			Pfilterfc = model.forecast_unc()
-			mu = np.hstack((V0[:n_K]*np.cos(V0[n_K:]),
-							V0[:n_K]*np.sin(V0[n_K:])))
+			mu = np.hstack((V0[:n_K]*np.cos(V0[n_K:]),V0[:n_K]*np.sin(V0[n_K:])))
+			Beta[:,:,k]=np.hstack((phi0[:,0].reshape(n/2,1),phi0[:,1].reshape(n/2,1)))
+			
+   
 		else:
-			xhatfc = model.forecast_state(xhat[:,k-1])
-			Pfilterfc = model.forecast_unc(Pfilter)
+
+
+			A11 = Beta[:n/2,0,k]*np.eye(2*n_K-np.size(meas_idx["Pk"])-np.size(meas_idx["Qk"]))
+			A12 = Beta[:n/2,1,k]*np.eye(2*n_K-np.size(meas_idx["Pk"])-np.size(meas_idx["Qk"]))
+			A21 = np.ones((n/2))*np.eye(2*n_K-np.size(meas_idx["Pk"])-np.size(meas_idx["Qk"]))
+			A22 = np.zeros((n/2))*np.eye(2*n_K-np.size(meas_idx["Pk"])-np.size(meas_idx["Qk"]))
+			A=np.vstack((np.hstack((A11,A12)),np.hstack((A21,A22)))) 
+    
+			Q11 = sigma[:n/2,k]*np.eye(2*n_K-np.size(meas_idx["Pk"])-np.size(meas_idx["Qk"]))
+			Q12 = np.zeros((2*n_K-np.size(meas_idx["Pk"])-np.size(meas_idx["Qk"]),2*n_K-np.size(meas_idx["Pk"])-np.size(meas_idx["Qk"])))
+			Q21 = np.zeros((2*n_K-np.size(meas_idx["Pk"])-np.size(meas_idx["Qk"]),2*n_K-np.size(meas_idx["Pk"])-np.size(meas_idx["Qk"])))
+			Q22 = np.zeros((2*n_K-np.size(meas_idx["Pk"])-np.size(meas_idx["Qk"]),2*n_K-np.size(meas_idx["Pk"])-np.size(meas_idx["Qk"])))
+			Q=np.vstack((np.hstack((Q11,Q12)),np.hstack((Q21,Q22))))
+			xhatfc = np.dot(A,xhat[:,k-1])
+			Pfilterfc = np.dot(A,np.dot(Pfilter,A.T)) + Q
 			mu = Vhat[:,k-1]
+
 		eta = xhatfc
 		varstop1 = 1
 		j1 = 1
@@ -417,300 +390,131 @@ def IteratedExtendedKalman(topology, meas, meas_unc, meas_idx, pseudo_meas, mode
 		Vhat[:,k] = mu
 		DeltaS[:,k-1] = xhat[:,k]
 		uDeltaS[:,k-1] = np.sqrt(np.diag(Pfilter))
-	
+ 
+		la[k+1]=0.99*la[k]+1-0.99 
+		gamma[:,k+1] = gamma[:,k]/(la[k+1]+gamma[:,k])
+
+		Psi[:,k,:] = np.dstack((xhat[::2,k-1],xhat[::2,k-2]))     
+		psi = Psi[:,k,:].squeeze()
+		beta = Beta[:,:,k].squeeze()      
+		e = xhat[::2,k]-np.diag(np.dot(beta, psi.T))
+		beta += np.dot(np.diag(gamma[:,k+1]/sigma[:,k] *e), (np.dot(F, psi.T)).T ) 
+		sigma[:,k+1]=sigma[:,k]+gamma[:,k+1]*(e**2-sigma[:,k])  
+		Beta[:,:,k+1] = beta                         
+		A11 = Beta[:n/2,0,k+1]*np.eye(2*n_K-np.size(meas_idx["Pk"])-np.size(meas_idx["Qk"]))
+		A12 = Beta[:n/2,1,k+1]*np.eye(2*n_K-np.size(meas_idx["Pk"])-np.size(meas_idx["Qk"]))
+		A21 = np.ones((n/2))*np.eye(2*n_K-np.size(meas_idx["Pk"])-np.size(meas_idx["Qk"]))
+		A22 = np.zeros((n/2))*np.eye(2*n_K-np.size(meas_idx["Pk"])-np.size(meas_idx["Qk"]))
+		A=np.vstack((np.hstack((A11,A12)),np.hstack((A21,A22)))) 
+    
+		Q11 = sigma[:n/2,k+1]*np.eye(2*n_K-np.size(meas_idx["Pk"])-np.size(meas_idx["Qk"]))
+		Q12 = np.zeros((2*n_K-np.size(meas_idx["Pk"])-np.size(meas_idx["Qk"]),2*n_K-np.size(meas_idx["Pk"])-np.size(meas_idx["Qk"])))
+		Q21 = np.zeros((2*n_K-np.size(meas_idx["Pk"])-np.size(meas_idx["Qk"]),2*n_K-np.size(meas_idx["Pk"])-np.size(meas_idx["Qk"])))
+		Q22 = np.zeros((2*n_K-np.size(meas_idx["Pk"])-np.size(meas_idx["Qk"]),2*n_K-np.size(meas_idx["Pk"])-np.size(meas_idx["Qk"])))
+		Q=np.vstack((np.hstack((Q11,Q12)),np.hstack((Q21,Q22))))
 	uS  = np.dot(Dnm,uDeltaS)
 	return Shat, Vhat, uS, DeltaS, uDeltaS
+ 
 
-def NLOextended(topology, meas, meas_unc, meas_idx, pseudo_meas, model, V0,
-				slack_idx=0, Y=None, accuracy=1e-9, maxiter=5):
-	"""
-	Iterated Extended Kalman filter for the nodal load observer (extended to all kind of measurements)
-	Real-valued matrices of complex-valued quantities are assumed to be structured as [ [real part], [imag part] ]
+ 
+ 
+ 
+ 
+#def IteratedExtendedKalman_moi(y,Sm,R,Yws,Vs,iterstop=50,accuracy=1e-9):
+#        
+#        p0=1.0
+#        P = p0*np.eye(nx) 
+#        Y00,Ys = separate_Yslack(Yws,slack_idx,dcomplex=False,prec=roundY)
+#        Slack = np.linalg.solve(Y00,np.dot(Ys,Vs)).__array__()
+#
+#    
+#        muiter=np.zeros((nm))
+#        temp1 = np.zeros((nx))
+#        temp2 = np.zeros((nm))
+#        V_est = np.zeros((2*n_K,t_f+1)) 
+#        v0 = 11/(np.sqrt(3))*np.hstack((np.ones(n_K), np.zeros(n_K)))
+#        
+#        if isinstance(v0,np.ndarray):
+#            V_est[:,0] = v0
+#        else:
+#            V_est[:n_K,0] = v0
+#        x_est=np.zeros((nx,t_f+1))         
+#            
+#        mu = np.hstack((v0[:n_K]*np.cos(v0[n_K:]),v0[:n_K]*np.sin(v0[n_K:])))
+#        Pf = P
+#        
+#        A11 = Beta[:nx/2,0,0]*np.eye(2*n_K-np.size(actpow_meas_idx)-np.size(reactpow_meas_idx))
+#        A12 = Beta[:nx/2,1,0]*np.eye(2*n_K-np.size(actpow_meas_idx)-np.size(reactpow_meas_idx))
+#        A21 = np.ones((nx/2))*np.eye(2*n_K-np.size(actpow_meas_idx)-np.size(reactpow_meas_idx))
+#        A22 = np.zeros((nx/2))*np.eye(2*n_K-np.size(actpow_meas_idx)-np.size(reactpow_meas_idx))
+#        A=np.vstack((np.hstack((A11,A12)),np.hstack((A21,A22)))) # (2*(n_k-1),2*(n_k-1))
+#                
+#        Q11 = sigma[:nx/2,0]*np.eye(2*n_K-np.size(actpow_meas_idx)-np.size(reactpow_meas_idx))
+#        Q12 = np.zeros((2*n_K-np.size(actpow_meas_idx)-np.size(reactpow_meas_idx),2*n_K-np.size(actpow_meas_idx)-np.size(reactpow_meas_idx)))
+#        Q21 = np.zeros((2*n_K-np.size(actpow_meas_idx)-np.size(reactpow_meas_idx),2*n_K-np.size(actpow_meas_idx)-np.size(reactpow_meas_idx)))
+#        Q22 = np.zeros((2*n_K-np.size(actpow_meas_idx)-np.size(reactpow_meas_idx),2*n_K-np.size(actpow_meas_idx)-np.size(reactpow_meas_idx)))
+#        Q=np.vstack((np.hstack((Q11,Q12)),np.hstack((Q21,Q22)))) # (2*(n_k-1),2*(n_k-1))
+#        for k in range(1,t_f+1):                    
+#                    xf = np.dot(A,x_est[:,k-1])
+#                    Pf = np.dot(A,np.dot(P,A.T)) + Q
+#                    mu = V_est[:,k-1]
+#                    eta = xf
+#                    est_error1 = 1
+#                    counter1 = 1   
+#                    while(est_error1 > accuracy) and (counter1 < iterstop):
+#                            MU= calcM(mu)
+#                            muiter =np.dot(np.dot(np.linalg.inv(Y00),MU),Sm[:,k-1]+np.dot(Dnm,eta)) - Slack[:,k-1]
+#                            est_error2 = 1
+#                            counter2 = 1
+#                            while  (est_error2 > accuracy) and (counter2 < iterstop):
+#                                    MU= calcM(muiter)
+#                                    temp2 = muiter
+#                                    muiter =np.dot(np.dot(np.linalg.inv(Y00),MU),Sm[:,k-1]+np.dot(Dnm,eta)) - Slack[:,k-1]
+#                                    est_error2 = np.linalg.norm(muiter-temp2)
+#                                    counter2 += 1
+#                                   
+#                            mu = muiter     
+#                            Dh = jacobian(Y00,Ys,mu,Vs[:,k-1])
+#                            H = np.dot(Cm,np.dot(np.linalg.inv(Dh),Dnm))
+#                            K=np.dot(np.dot(Pf,H.T),np.linalg.pinv(np.dot(H,np.dot(Pf,H.T))+R))
+#                            temp1 = eta
+#                            eta = xf + np.dot(K,y[:,k-1] - np.dot(Cm,mu) - np.dot(H,xf-eta))
+#                            est_error1 = np.linalg.norm(temp1-eta)
+#                            counter1 += 1
+#        
+#                    x_est[:,k]= eta
+#                    P = np.dot(np.eye(nx)-np.dot(K,H),Pf)
+#                    V_est[:,k] = mu
+#                    DeltaS_est[:,k-1] = x_est[:,k]
+#                    UncDeltaS[:,k-1] = np.sqrt(np.diag(P))
+#                    S_est[:,k-1] = Sm[:,k-1] + np.dot(Dnm,DeltaS_est[:,k-1]) # S_est = S + D_ng * DeltaS_est
+#                    
+#                    la[k]=0.99*la[k-1]+1-0.99
+#                    gamma[:,k] = gamma[:,k-1]/(la[k]+gamma[:,k-1])
+#                    #gamma[:,k] = 1.0/(k+0.1)   
+#                    Psi[:,k-1,:] = np.dstack((x_est[::2,k-2],x_est[::2,k-3]))     
+#                    psi = Psi[:,k-1,:].squeeze()
+#                    beta = Beta[:,:,k-1].squeeze()      
+#                    e = x_est[::2,k-1]-np.diag(np.dot(beta, psi.T))
+#                    beta += np.dot(np.diag(gamma[:,k]/sigma[:,k-1] *e), (np.dot(F, psi.T)).T ) 
+#                    sigma[:,k]=sigma[:,k-1]+gamma[:,k]*(e**2-sigma[:,k-1])  
+#                    Beta[:,:,k] = beta                         
+#                    
+#                    A11 = Beta[:nx/2,0,k]*np.eye(2*n_K-np.size(actpow_meas_idx)-np.size(reactpow_meas_idx))
+#                    A12 = Beta[:nx/2,1,k]*np.eye(2*n_K-np.size(actpow_meas_idx)-np.size(reactpow_meas_idx))
+#                    A21 = np.ones((nx/2))*np.eye(2*n_K-np.size(actpow_meas_idx)-np.size(reactpow_meas_idx))
+#                    A22 = np.zeros((nx/2))*np.eye(2*n_K-np.size(actpow_meas_idx)-np.size(reactpow_meas_idx))
+#                    A=np.vstack((np.hstack((A11,A12)),np.hstack((A21,A22)))) 
+#
+#                    Q11 = sigma[:nx/2,k]*np.eye(2*n_K-np.size(actpow_meas_idx)-np.size(reactpow_meas_idx))
+#                    Q12 = np.zeros((2*n_K-np.size(actpow_meas_idx)-np.size(reactpow_meas_idx),2*n_K-np.size(actpow_meas_idx)-np.size(reactpow_meas_idx)))
+#                    Q21 = np.zeros((2*n_K-np.size(actpow_meas_idx)-np.size(reactpow_meas_idx),2*n_K-np.size(actpow_meas_idx)-np.size(reactpow_meas_idx)))
+#                    Q22 = np.zeros((2*n_K-np.size(actpow_meas_idx)-np.size(reactpow_meas_idx),2*n_K-np.size(actpow_meas_idx)-np.size(reactpow_meas_idx)))
+#                    Q=np.vstack((np.hstack((Q11,Q12)),np.hstack((Q21,Q22))))
+#        return S_est, x_est, Beta, sigma  
+ 
+ 
 
-	In this variant of the NLO, calculation of voltages in each time step is carried out by fitting to bus power.
-	The Kalman correction step uses nodal voltages, bus power and line power.
-
-	:param topology: dict containing information on bus, branch, ... in PyPower format
-	:param meas: dict containing measurements "Pk", "Qk", "Vm" and "Va"
-	:param meas_unc: dict containing associated standard uncertainties
-	:param meas_idx: dict containing the corresponding indices
-	:param pseudo_meas: dict containing the corresponding pseudo-measurements
-	:param model: DynamicModel object as defined in dynamic_models.py
-	:param V0: initial estimate of nodal voltages at all nodes except slack
-	:param Vs: voltage amplitude and phase at slack node
-	:param slack_idx: index of slack node
-	:param Y: (optional) admittance matrix
-	:param accuracy: threshold for inner iteration of the iterated EKF
-	:param maxiter: maximum number of inner iterations of the iterated EKF
-
-	:return: Shat, Vhat, uShat, DeltaS, uDeltaS
-	"""
-	if slack_idx > 0:
-		raise NotImplementedError("Only slack node at bus index 0 implemented yet.")
-
-	meas_names =  ["Pk","Qk","Pl","Ql","Vm","Va"]
-	meas, meas_idx, meas_unc = repair_meas(meas, meas_idx, meas_unc, expected_indices = meas_names)
-	n = model.dim
-	n_K = len(V0)/2 	# assume that V0 does not contain slack bus voltage
-
-	# remove index of slack bus
-	non_ref = range(1, n_K) + range(n_K + 1, 2 * n_K)
-
-	# generate matrices to map measured values to full list for all buses
-	pmeas = np.zeros(n_K,dtype = bool); pmeas[meas_idx["Pk"]] = True
-	qmeas = np.zeros(n_K,dtype = bool); qmeas[meas_idx["Qk"]] = True
-	vmeas = np.zeros(n_K,dtype = bool); vmeas[meas_idx["Vm"]] = True
-	Cm,Dnm,Dm = get_system_matrices(pmeas,qmeas,vmeas)
-	Dnm = model.adjust_Dnm(Dnm) # adjust for the case of AR(2) process
-	Dnm_nB = Dnm[non_ref, :]
-
-	# generate admittance matrix from network data if not provided by the user
-	if not isinstance(Y,np.ndarray):
-		Y = makeYbus(topology["baseMVA"],topology["bus"],topology["branch"])
-	y, cap = calc_admittance(topology["branch"])[1:]
-	# calculate network functions and their Jacobians
-	J_dSdV, J_dHdV, f_hSK, f_hSl = network_equations(Y, y, cap, n_K, meas_idx)
-
-	# calculate vector of nodal powers from actual and pseudo measurements
-	Sm = np.r_[meas["Pk"], meas["Qk"]]
-	Sfc = np.r_[pseudo_meas["Pk"], pseudo_meas["Qk"]]
-	u = np.dot(Dm,Sm) + np.dot(Dnm,Sfc)
-	nT = u.shape[1]
-
-	xhat = np.zeros((n,nT))
-	Vhat = np.zeros((2 * n_K, nT))
-	Shat = np.zeros((2 * n_K, nT))
-	DeltaS = np.zeros_like(xhat)
-	uDeltaS= np.zeros_like(xhat)
-	P = []
-
-	# helper function
-	def calcV(V, eta, meas_k, umeas_k, k, PF_accuracy = 1e-16):
-		"""Calculate nodal voltages by minimizing the difference between measured and calculated bus power using Newton's method
-		:rtype: tuple
-		:param meas_k: measured values
-		:param umeas_k: uncertainties associated with measured values
-		:return: V, h_V, Jacobian_V
-		"""
-		def voltage2buspower(v):
-			EqPF = f_hSK(*v)[non_ref]
-			JacSE = J_dSdV(*v)[non_ref]
-			return EqPF, JacSE
-
-		pf_stop = 1; pf_iter = 0
-		Jac_SfromV = None
-		SfromV = None
-		S = np.dot(Dm,np.r_[meas_k['Pk'],meas_k['Qk']]) + np.dot(Dnm,Sfc[:,k]) + Dnm.dot(eta)
-		while pf_stop > PF_accuracy and pf_iter < 20:
-			SfromV, Jac_SfromV = voltage2buspower(V)
-			delta_V = np.linalg.solve(Jac_SfromV, S[non_ref] - SfromV)
-			V[non_ref] = V[non_ref] + delta_V
-			pf_stop = np.linalg.norm(delta_V)
-			pf_iter += 1
-		return V
-
-	# Iterated Extended Kalman Filter
-	for k in range(nT):
-		meas_k, umeas_k = meas_at_time(meas,meas_unc,k,meas_names)
-		if k == 0:
-			xhatfc = model.forecast_state()
-			Pfc = model.forecast_unc()
-			mu  = V0
-			if len(meas_idx['Vm'])>0:
-				mu[meas_idx["Vm"]] = meas_k["Vm"][:]
-			if len(meas_idx['Va'])>0:
-				mu[n_K+np.asarray(meas_idx["Va"])] = meas_k["Va"][:]
-			# xhat[:,k] = xhatfc[:]
-			# P.append(Pfc)
-			# Shat[:, k] = u[:, k] + np.dot(Dnm, xhat[:, k])
-			# Vhat[:,k] = mu.copy()
-			# continue 	# at time 0 use forecast as estimate
-		else:
-			xhatfc = model.forecast_state(xhat[:, k - 1])
-			Pfc = model.forecast_unc(P[k - 1])
-			mu = Vhat[:, k - 1].copy()
-			if len(meas_idx['Vm'])>0:
-				mu[meas_idx["Vm"]] = meas_k["Vm"]
-			if len(meas_idx['Va'])>0:
-				mu[n_K+np.asarray(meas_idx["Va"])] = meas_k["Va"]
-
-		Meas, R, meas_inds = construct_meas_vector(meas_k,umeas_k,meas_names)
-		iekf_stop = 1; j1 = 1
-		eta = xhatfc
-		while (iekf_stop > accuracy) and (j1 < maxiter):
-			V = calcV(mu, eta, meas_k, umeas_k, k)
-			Eq1 = np.dot(Dm.T, f_hSK(*V))   # bus power from nodal voltage at measured buses
-			Eq2 = f_hSl(*V)  # from/to power and voltage magnitude at measured buses
-			h = np.r_[Eq1, Eq2]
-
-			JdSdV = J_dSdV(*V)
-			JdVdDS = np.linalg.solve(JdSdV[non_ref,:], Dnm[non_ref,:])  # Jacobian of inverse of 'bus power from nodal voltage'
-			JdhdV = np.r_[np.dot(Dm.T, JdSdV), J_dHdV(*V)]
-			H = np.dot(JdhdV, JdVdDS)
-			K = np.dot(Pfc, np.linalg.solve((np.dot(H, np.dot(Pfc, H.T)) + R).T, H).T)
-			temp = eta.copy()
-			eta = xhatfc + np.dot(K, Meas - h - np.dot(H, xhatfc - eta))
-			iekf_stop = np.linalg.norm(temp-eta)
-			j1 += 1
-		P.append(np.dot(np.eye(n) - np.dot(K, H), Pfc))
-		xhat[:, k] = eta
-		Shat[:, k] = u[:, k] + np.dot(Dnm, xhat[:, k])
-		Vhat[:, k] = V[:]
-		DeltaS[:,k-1] = xhat[:,k]
-		uDeltaS[:,k-1] = np.sqrt(np.diag(P[k]))
-	uS = np.dot(Dnm, uDeltaS)
-
-	return Shat, Vhat, uS, DeltaS, uDeltaS
-
-
-def meas_at_time(meas,meas_unc,ind,meas_names=None):
-	"""Returns dictionary with the entries of meas at time index ind.
-	:param meas: dict of measurements
-	:param ind: time index
-	:return: meas_ind
-	"""
-	meas_ind = dict([])
-	umeas_ind = dict([])
-	if not isinstance(meas_names,list):
-		meas_names = meas.keys()
-	for key in meas_names:
-		if len(meas[key].shape)==2:
-			meas_ind[key] = meas[key][:,ind]
-		elif len(meas[key])>0:
-			meas_ind[key] = meas[key][ind]
-		else:
-			meas_ind[key] = []
-
-		if len(meas_unc[key].shape)==2:
-			umeas_ind[key] = meas_unc[key][:,ind]
-		elif len(meas_unc[key])>0:
-			umeas_ind[key] = meas_unc[key][ind]
-		else:
-			umeas_ind[key] = []
-	return meas_ind, umeas_ind
-
-
-def construct_meas_vector(meas,meas_unc,meas_names=["Pk","Qk","Vm","Va"]):
-	"""Returns numpy array of measurements and corresponding uncertainties/inverse weights
-	:param meas: dict of measurement data at single time instant
-	:param meas_unc: dict of measurement uncertainty at single time instant
-	:param meas_idx: dict of measurement indices
-	:return: Meas, R
-	"""
-	Meas = []
-	inds = {}
-	count = 0
-	for key in filter(lambda ind: len(meas[ind])>0, meas_names):
-		Meas = np.r_[Meas,meas[key]]
-		inds[key] = np.arange(count, count + len(meas[key]))
-	r = []
-	for key in filter(lambda ind: len(meas[ind])>0, meas_names):
-		if isinstance(meas_unc[key],float):
-			r = np.r_[r, meas_unc[key]**2*np.ones_like(meas[key])]
-		else:
-			r = np.r_[r,meas_unc[key]**2]
-	R = np.diag(r)
-
-	return Meas, R, inds
-
-
-def network_equations(Y, y, cap, nK, meas_idx):
-	"""Set up network equations to calculate estimates of bus power, power at line and voltages. This method uses
-	 symbolic equations and calculates the Jacobian matrix with respect to nodal voltages.
-	:param meas_idx: dict containg uncertainty associated with measurement data
-	:return: J_dSdV, J_dHdV, f_hSK, f_hSl
-	"""
-	import sympy
-
-	def makearray(Mat):
-		M = np.array(Mat)
-		if M.shape[1] == 1:
-			return M.flatten()
-		else:
-			return M
-	mat2array = [{'ImmutableMatrix': makearray}, 'numpy']
-
-	JMatrix_dSdV, hSK = jacobian_dSdV(Y, nK)
-	JMatrix_dHdV, hSluV = jacobian_dHdV(nK, y, cap, meas_idx)
-
-	J_dSdV = sympy.lambdify(tuple(["e%d" % (i + 1) for i in range(nK)] + ["f%d" % (i + 1) for i in range(nK)]),
-							JMatrix_dSdV, modules = mat2array)
-	f_hSK = sympy.lambdify(tuple(["e%d" % (i + 1) for i in range(nK)] + ["f%d" % (i + 1) for i in range(nK)]), hSK,
-						   modules = mat2array)
-	if hSluV is None:
-		J_dHdV = lambda *V: np.array([[]])
-		f_hSl = lambda *V: np.array([])
-	else:
-		J_dHdV = sympy.lambdify(tuple(["e%d" % (i + 1) for i in range(nK)] + ["f%d" % (i + 1) for i in range(nK)]),
-								JMatrix_dHdV, modules = mat2array)
-		f_hSl = sympy.lambdify(tuple(["e%d" % (i + 1) for i in range(nK)] + ["f%d" % (i + 1) for i in range(nK)]), hSluV,
-							  modules = mat2array)
-	return J_dSdV, J_dHdV, f_hSK, f_hSl
-
-
-def calc_admittance(network_branches):
-	""" From network branch information in PyPower format calculate the bus and network admittances.
-
-	:param network_branches: numpy array contain all information about the network branches
-	:returns: bus admittance matrix Y, line admittances y and line capacitances cap
-
-	"""
-	nK = int(network_branches[:,:2].max())
-	dim  = network_branches.shape[0]
-	r = np.zeros((nK,nK))
-	x = np.zeros_like(r)
-	cap=np.zeros_like(r)        # Capacity between branch and earth
-
-	for i in range(dim):
-		k_start = network_branches[i,0]-1
-		k_end = network_branches[i,1]-1
-		r[k_start,k_end] = network_branches[i,2]
-		x[k_start,k_end] = network_branches[i,3]
-		cap[k_start,k_end]=network_branches[i,4]
-
-	r += r.T
-	x += x.T
-	cap += cap.T
-	z = r + 1j*x
-	y = np.zeros_like(z)
-	for i in range(nK):
-		for j in range(nK):
-			if z[i,j] != 0:
-				y[i,j] = 1/z[i, j]
-	Y = -y
-	for i in range(nK):
-		Y[i,i] = np.sum(y[i,:])+1j*np.sum(cap[i,:]/2)
-	return Y, y, cap
-
-
-
-def repair_meas(meas, meas_idx, meas_unc, expected_indices=None):
-	"""
-	The dictionaries meas, meas_idx and meas_unc are expected to contain certain keys.
-	If any of these keys are missing, this function sets up corresponding default values.
-	:param meas: dict containing measurement data
-	:param meas_unc: dict containing uncertainty associated with measurement data
-	:param meas_idx: dict containing index arrays indicating index of measurement in bus/branch array
-	:return: meas, meas_idx, meas_unc
-	"""
-	if not isinstance(expected_indices,list):
-		expected_indices = ['Pk','Qk','Pl','Ql','Vm','Va']
-
-	for key in expected_indices:
-		if key in meas:
-			if not key in meas_idx: raise ValueError("Key %s in `meas`, but not in 'meas_idx'"%key)
-			if not key in meas_unc:
-				print "Uncertainty is not specified for measurements '%s'. Using sigma=20 %% instead."%key
-				meas_unc[key] = np.ones_like(meas[key])*meas[key].max()*0.2
-			elif meas_unc[key].shape != meas[key].shape:  # assume uncertainty constant over time
-				meas_unc[key] = np.tile(meas_unc[key], (meas[key].shape[1], 1) ).T
-
-		else:
-			meas[key] = np.array([])
-			meas_idx[key] = []
-			meas_unc[key] = np.array([])
-	return meas, meas_idx, meas_unc
-	
 def amph_phase_to_real_imag(A,P,Ua,Up):
 	"""
 	Transforms uncertainties associated with amplitude A and phase P to the corresponding real and imaginary parts
