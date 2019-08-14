@@ -1,0 +1,201 @@
+<!doctype html>
+<html class="no-js">
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="x-ua-compatible" content="ie=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+	<title>NLO - Tutorial</title>
+
+    <meta name="theme-version" content="1.6.2" />
+    <meta name="foundation-version" content="5.5.3" />
+    <meta name="modernizr-version" content="2.8.3" />
+
+	
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    extensions: ["tex2jax.js"],
+    jax: ["input/TeX", "output/HTML-CSS"],
+    tex2jax: {
+      inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+      displayMath: [ ['$$','$$'], ["\\[","\\]"] ],
+      processEscapes: true
+    },
+    "HTML-CSS": { availableFonts: ["TeX"] }
+  });
+</script>
+<script type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js">
+</script>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+		<meta name="robots" content="index, follow" />
+		<meta name="generator" content="RapidWeaver" />
+		
+
+	<link rel="stylesheet" type="text/css" media="all" href="rw_common/themes/foundation/consolidated.css?rwcache=521963582" />
+		
+	<script>var foundation={};</script>
+	<script>function loadCSS(a,b,c){"use strict";var d=window.document.createElement("link"),e=b||window.document.getElementsByTagName("script")[0],f=window.document.styleSheets;return d.rel="stylesheet",d.href=a,d.media="only x",e.parentNode.insertBefore(d,e),d.onloadcssdefined=function(a){for(var b,c=0;c<f.length;c++)f[c].href&&f[c].href===d.href&&(b=!0);b?a():setTimeout(function(){d.onloadcssdefined(a)})},d.onloadcssdefined(function(){d.media=c||"all"}),d}</script>
+
+	
+
+			<link rel='stylesheet' type='text/css' media='all' href='rw_common/plugins/stacks/stacks.css?rwcache=521963582' />
+		<link rel='stylesheet' type='text/css' media='all' href='files/stacks_page_page0.css?rwcache=521963582' />
+		<script type='text/javascript' charset='utf-8' src='rw_common/plugins/stacks/jquery-2.2.4.min.js?rwcache=521963582'></script>
+		
+		
+		<script type='text/javascript' charset='utf-8' src='files/stacks_page_page0.js?rwcache=521963582'></script>
+		<meta class="stacks3 stack version" id="uk.co.doobox.1doococco" name="Cocco" content="1.0.6">
+		<meta class="stacks3 stack version" id="com.joeworkman.stacks.anchor" name="Link Anchor" content="2.3.0">
+		
+
+	<script>var jQuery=stacks.jQuery,$=jQuery;﻿</script>
+	
+</head>
+
+<body class="antialiased">
+
+<div id="foundation-loader"></div>
+
+
+<div id='stacks_out_1_page0' class='stacks_top'><div id='stacks_in_1_page0' class=''><div id='stacks_out_2_page0' class='stacks_out'><div id='stacks_in_2_page0' class='stacks_in com_yourhead_stack_header_stack'><h2>Tutorial for using the nodal load observer (NLO)</h2></div></div><div id='stacks_out_31_page0' class='stacks_out'><div id='stacks_in_31_page0' class='stacks_in com_yourhead_stack_header_stack'><h5>Implementation of the NLO in MATLAB</h5></div></div><div id='stacks_out_17_page0' class='stacks_out'><div id='stacks_in_17_page0' class='stacks_in text_stack'><strong>Outline</strong><br /><a href="#intro">Introduction to the NLO</a><br />Application of the NLO<br /><ul class="disc"><li><a href="#pseudo">Assignment of pseudo-measurement buses</a></li><li><a href="#inputs">Create input matrices and vector</a></li><li><a href="#run">Run the NLO</a></li></ul></div></div><div id='stacks_out_19_page0' class='stacks_out'><div id='stacks_in_19_page0' class='stacks_in com_yourhead_stack_header_stack'><h3>Introduction to the NLO</h3></div></div><a id="intro" name="intro" class="anchor"> </a> 
+
+<div id='stacks_out_13_page0' class='stacks_out'><div id='stacks_in_13_page0' class='stacks_in text_stack'>A generic system model for quasi-dynamic state estimation is given by<br />\begin{align}<br />	x(k+1) =& F(k)x(k) + g(k) + w(k) \label{SysEq1}\\<br />	z(k) =& h(x(k)) + v(k) \label{SysEq2}<br />\end{align}<br />with $x(k)$ the state vector, $F(k)$ the transition matrix, $g(k)$ models trend behavior, $z(k)$ the measurement vector and $h()$ the load-flow function. The errors $w(k)$ and $v(k)$ are assumed to be independent Gaussian with known covariance matrices $Q(k)$ and $R(k)$, respectively.<br />The extended Kalman filter for this model is then given by<br />\begin{align}<br />	\hat{x}(k,k-1)=& F(k)\hat{x}(k-1,k-1) + g(k) \label{pred1}\\<br />	P(k,k-1) =& F(k)P(k-1,k-1)F^T(k)+Q(k) \label{pred2}\\<br />	K(k) =& P(k,k-1)H^T(k) \times \nonumber \\ &\times (H(k)P(k,k-1)H^T(k)+R(k))^{-1} \label{gain}\\<br />	P(k,k) =& (I-K(k)H(k))P(k,k-1) \label{corr1}\\<br />	\hat{x}(k,k) =& \hat{x}(k,k-1) + K(k)(z(k) - h(\hat{x}(k,k-1))) \label{corr2}<br />\end{align}<br />with Jacobian matrix $H(k) = \frac{\partial h(x(k))}{\partial x(k)}\vert_{x(k)=\hat{x}(k,k-1)}$. One advantage of the Kalman filter approach is that estimates of the system states $x(k)$ are obtained together with an estimate of the error covariance $P(k|k)$, which can be interpreted as the uncertainty associated with the system states estimate.</div></div><div id='stacks_out_10_page0' class='stacks_out'><div id='stacks_in_10_page0' class='stacks_in com_yourhead_stacks_two_columns_stack'><div class='s3_row'>
+	<div class='s3_column s3_column_left'><div id='stacks_out_6_page0' class='stacks_out'><div id='stacks_in_6_page0' class='stacks_in image_stack'>
+<div class='centered_image' >
+    <img class='imageStyle' src='files/stacks-image-f8c1bc0.jpg' alt='Stacks Image 7' />
+</div>
+
+</div></div></div>
+	<div class='s3_column s3_column_right'><div id='stacks_out_4_page0' class='stacks_out'><div id='stacks_in_4_page0' class='stacks_in text_stack'>The nodal load observer (NLO) utilizes as system states $x(k)$ the difference $\Delta S(k)=S^{true}(k)-S^{pm}(k)$ between the (unknown) true bus power values $S^{true}$ and corresponding pseudo-measurements $S^{pm}$. The vector of bus power $S(k)$ is then obtained as a combination of measured bus powers $S^{m}$ and (improved) pseudo-measurements ${S}^{pm}$<br />\[ S(k) = D_{nm} \left({S}^{pm}(k) + \Delta S(k)\right) + D_{m}S^{m}(k) .\]<br />The matrices $D_{m}$ and $D_{nm}$ contain only zeros and ones and are used to construct the vector of all bus powers by mapping the measurements and pseudo-measurements to the respective bus indices. </div></div></div>
+</div></div></div><div id='stacks_out_15_page0' class='stacks_out'><div id='stacks_in_15_page0' class='stacks_in text_stack'>The original state space model for the NLO which is employed in the code below is given by:<br />\begin{align}<br />	\Delta S(k+1)=& \gamma \Delta S(k) + w(k) \label{NLO1} \\<br />	V(k) =& h(S(k)) + v(k) , \label{NLO2}<br />\end{align}<br />with $\gamma \in (0,1)$, and the function $h$ in the observation equation is obtained by solving <br />$$ 	S = diag(V)Y V $$<br />with respect to $V$, where $diag(V)$ denotes a diagonal matrix with entries containing the (complex) nodal voltages. The parameter $\gamma$ has a significant impact on the estimation result as it models, how fast systematic errors in the pseudo-measurements are assumed to become solely random noise.</div></div><div id='stacks_out_60_page0' class='stacks_out'><div id='stacks_in_60_page0' class='stacks_in com_yourhead_stack_header_stack'><h3>Application of the NLO - preliminary steps</h3></div></div><div id='stacks_out_64_page0' class='stacks_out'><div id='stacks_in_64_page0' class='stacks_in uk_co_doobox_1doococco_stack'><!-- Start 1dooCocco stack template --><pre class="stacks_in_64_page0cocco">%% misc (clear command line, close all figures and delete the whole workspace)
+clc
+close all
+clear all
+
+%% options for the iterated extended Kalman filter
+accuracy = 1e-9;
+iterstop = 50;
+
+%% Read measurement data
+% read measurement data - at this point all buses are considered to be instrumented
+filename = 'NLODaten.xlsx';
+sheet1 = xlsread(filename,1);
+% Active and reactive bus power are changed for those buses which are to be considered as pseudo-measurements
+Pk = xlsread(filename,2);
+Qk = xlsread(filename,3);
+% save the other data for later usage
+sheet4 = xlsread(filename,4);
+sheet5 = xlsread(filename,5);
+sheet6 = xlsread(filename,6);
+sheet7 = xlsread(filename,7);
+% read pseudo-measurements for bus power from file
+pseudoPk = xlsread(filename,8);
+pseudoQk = xlsread(filename,9);</pre><!-- End 1dooCocco stack template --></div></div><a id="pseudo" name="pseudo" class="anchor"> </a> 
+
+<div id='stacks_out_68_page0' class='stacks_out'><div id='stacks_in_68_page0' class='stacks_in com_yourhead_stack_header_stack'><h3>Application of the NLO - Assignment of pseudo-measurement buses</h3></div></div><div id='stacks_out_66_page0' class='stacks_out'><div id='stacks_in_66_page0' class='stacks_in uk_co_doobox_1doococco_stack'><!-- Start 1dooCocco stack template --><pre class="stacks_in_66_page0cocco">%% Create scenario with pseudo-measurements
+% In this example we move node 3 from 'measurements' to 'pseudo-measurements'
+% and move node 6 from 'pseudo-measurements' to 'measurements'
+tmp_Pk = Pk(2,:); tmp_Qk = Qk(2,:);
+Pk(2,:) = []; Qk(2,:) = [];
+tmp_pseudoPk = pseudoPk(3,:); tmp_pseudoQk = pseudoQk(3,:);
+pseudoPk(2,:) = []; pseudoQk(2,:) = [];
+Pk(end+1,:) = tmp_Pk; Qk(end+1,:) = tmp_Qk;
+pseudoPk(end+1,:) = tmp_pseudoPk; pseudoQk(end+1,:) = tmp_pseudoQk;
+[~,sind] = sort(Pk(:,1)); Pk = Pk(sind,:);
+[~,sind] = sort(Qk(:,1)); Qk = Qk(sind,:);
+[~,sind] = sort(pseudoPk(:,1)); pseudoPk = pseudoPk(sind,:);
+[~,sind] = sort(pseudoQk(:,1)); pseudoQk = pseudoQk(sind,:);
+filename = [filename(1:strfind(filename,'.')-1),'_modified.xlsx'];
+%save this configuration, write xls-file
+xlswrite(filename,sheet1,1);
+xlswrite(filename,Pk,2); xlswrite(filename,Qk,3);
+xlswrite(filename,sheet4,4); xlswrite(filename,sheet5,5); xlswrite(filename,sheet6,6); xlswrite(filename,sheet7,7);
+xlswrite(filename,pseudoPk,8); xlswrite(filename,pseudoQk,9);</pre><!-- End 1dooCocco stack template --></div></div><a id="inputs" name="inputs" class="anchor"> </a> 
+
+<div id='stacks_out_33_page0' class='stacks_out'><div id='stacks_in_33_page0' class='stacks_in com_yourhead_stack_header_stack'><h3>Application of the NLO - Create input matrices and vectors</h3></div></div><div id='stacks_out_70_page0' class='stacks_out'><div id='stacks_in_70_page0' class='stacks_in uk_co_doobox_1doococco_stack'><!-- Start 1dooCocco stack template --><pre class="stacks_in_70_page0cocco">%% NLO Step 1: read data files and create structures
+% -> Define the admittance matrix, measurements at nodes (active/reactive power and voltage),
+% measurements on branches (active/reactive power and voltage), forecast nodes (active/reactive power))
+[nK Admittanz] = admittance_matrix(filename);
+[num measure numfc forecast T] = read_meas_structure(filename);
+[D] = Logi_matrix_D(nK, num, numfc);
+
+% Array of all measurements organized as Matlab structs
+Mess=[measure.Pk; measure.Qk; measure.Pl;  measure.Ql; measure.Vk];
+
+% Arrays of active and reactive bus powers at all nodes constructed by combining pseudo-measurements and actual measurements
+uPk=D.mP*measure.Pk + D.nmP*forecast.Pk;
+uQk=D.mQ*measure.Qk + D.nmQ*forecast.Qk;
+uSk=[uPk;uQk];</pre><!-- End 1dooCocco stack template --></div></div><a id="run" name="run" class="anchor"> </a> 
+
+<div id='stacks_out_48_page0' class='stacks_out'><div id='stacks_in_48_page0' class='stacks_in com_yourhead_stack_header_stack'><h3>Application of the NLO - Run the NLO</h3></div></div><div id='stacks_out_72_page0' class='stacks_out'><div id='stacks_in_72_page0' class='stacks_in uk_co_doobox_1doococco_stack'><!-- Start 1dooCocco stack template --><pre class="stacks_in_72_page0cocco">%% NLO Step 2: Initialize the Kalman filter
+[nX xhat Pfilter Vhat Shat x0 Pfilter0 Q R A] = initialize_Kalman(nK, num, T);
+Vhat0=[ones(nK,1); zeros(nK,1)];
+if ~isempty(num.Vk)
+    Vhat0(num.Vk)=measure.Vk(:,1);
+end
+eta=zeros(2*nK,1);
+
+%% NLO Step 3: run the Kalman filter
+for time=1:T
+    if time==1   % At the first time step no previous information is available.
+        xhatfc = x0;
+        Pfilterfc = A*Pfilter0*A'+Q;
+        mu = Vhat0;
+    else        % Use previous estimate to forecast next value using the dynamic model.
+        xhatfc = A*xhat(:,time-1);
+        Pfilterfc = A*Pfilter{time-1}*A'+Q;
+        mu = Vhat(:,time-1);
+    end
+    eta=xhatfc;
+    varstop1=1;
+    j1=1;
+% repeat the Kalman prediction step until errors due to linearization are minimized.
+    while ((varstop1 > accuracy) && (j1 < iterstop))     %iterated extended kalman filter (IEKF)
+        V = mu(1:nK)+1j*mu(nK+1:end);
+        Vef = [real(V(2:end)); imag(V(2:end))];
+        for anzPF = 1:10  % fixed number of power flow iterations to calculate nodal volatges
+            [equatPF equatRe]  = power_flow_equations(nK, Admittanz, V, num);    % assignment of equations
+            [JacPF JacRe] = Jacobian(nK, Admittanz, V, num);         % assignment of jacobi-matrix
+            JacPF = JacPF([2:nK,nK+2:end],:);
+            etanm  =D.nmS*eta;
+            deltaV = JacPF\(uSk([2:nK,nK+2:end],time)+etanm([2:nK,nK+2:end])-equatPF([2:nK,nK+2:end]));
+            Vef = Vef+deltaV;
+            V(2:end) = Vef(1:nK-1)+1j*Vef(nK:end);
+        end
+        mu = [real(V); imag(V)];
+        [equatPF equatRe] = power_flow_equations(nK, Admittanz, V, num);        % assignment of equations
+        [JacPF JacRe] = Jacobian(nK, Admittanz, V, num);            % assignment of jacobi-matrix
+        equatPF = D.mS\equatPF;
+        equat = [equatPF;equatRe];
+        JdVdDS = JacPF([2:nK,nK+2:end],:)\D.nmS([2:nK,nK+2:end],:);
+        JdhdV = [D.mS'*JacPF; JacRe];
+        H=JdhdV*JdVdDS;
+        MessT=Mess(:,time);
+        K = Pfilterfc * H' / (H * Pfilterfc * H' + R);              % "right inverse" (the heart of the kalman filter)
+        temp1 = eta;
+        eta = xhatfc + K * (MessT - equat - H * (xhatfc - eta));
+        varstop1 = norm(temp1-eta);
+        j1 = j1+1;
+    end
+    % Data assimilation step (correction part of the Kalman filter)
+    Pfilter{time} = (eye(nX) - K * H) * Pfilterfc;
+    xhat(:,time) = eta;
+    Shat([1,nK+1],time)=uSk([1,nK+1],time);
+    Shat([2:nK,nK+2:2*nK],time) = uSk([2:nK,nK+2:2*nK],time) + D.nmS([2:nK,nK+2:end],:)*xhat(:,time);
+    Vhat(:,time) = mu;
+    disp(['Time step:' num2str(time)]);
+
+    V_Mag(:,time) = abs(V);
+    V_rad = angle(V);
+    V_deg(:,time) = rad2deg(V_rad);
+end
+</pre><!-- End 1dooCocco stack template --></div></div><a id="inputs" name="inputs" class="anchor"> </a> 
+
+<div id='stacks_out_40_page0' class='stacks_out'><div id='stacks_in_40_page0' class='stacks_in com_yourhead_stack_header_stack'><h3>References</h3></div></div><div id='stacks_out_54_page0' class='stacks_out'><div id='stacks_in_54_page0' class='stacks_in text_stack'><ol class="arabic-numbers"><li>https://github.com/eichstaedtPTB/GridSens, visited 2016-31-03, commit 1315ff4</li><li>S.~Eichst&auml;dt, N.~Makarava N. and C.~Elster, "On the evaluation of uncertainties for state estimation with the Kalman filter", Pre-print at http://arxiv.org/abs/1605.01235, submitted to Measurement Science and Technology, 2016.</li><li>W.~Heins, G.~Gewiss, C.~Bohn and H.-P.~Beck, "State-space formulation for the nodal load observer for smart electrical grids with imperfect measurement infrastructure", XX IMEKO World Congress, pp.~1-6, 2012.</li><li>W.~Heins, N.~Ell, H.-P.~Beck and C.~Bohn, "State observation in medium-voltage grids with incomplete measurement infrastructure through online correction of power forecasts", Proceedings of European Control Conference, Strasbourg, France, 2014.</li><li>Do Coutto Filho, M. B., de Souza, J. C. S.: Forecasting-aided state estimation-Part I: Panorama. IEE Transactions on power systems. vol. 24(4), pp. 1667-1677 (2009).</li></ol></div></div><div id='stacks_out_38_page0' class='stacks_out'><div id='stacks_in_38_page0' class='stacks_in text_stack'>License<br />=======<br /><br />copyright Guosong Lin (TU Clausthal), Franko Schmaehling (PTB), Sascha Eichstaedt (PTB) 2017<br /><br />This software is licensed under the BSD-like license:<br /><br />Redistribution and use in source and binary forms, with or without<br />modification, are permitted provided that the following conditions are met:<br /><br /> 1. Redistributions of source code must retain the above copyright notice,<br />     this list of conditions and the following disclaimer.<br /> 2. Redistributions in binary form must reproduce the above copyright<br />    notice, this list of conditions and the following disclaimer in<br />    the documentation and/or other materials provided with the distribution.<br /><br />DISCLAIMER<br />==========<br />This software was developed at Physikalisch-Technische Bundesanstalt (PTB). The software is made available "as is" free of cost. PTB assumes no responsibility whatsoever for its use by other parties, and makes no guarantees, expressed or implied, about its quality, reliability, safety, suitability or any other characteristic. In no event will PTB be liable for any direct, indirect or consequential damage arising in connection with the use of this software.</div></div></div></div>
+
+
+<script src="rw_common/themes/foundation/foundation.js?rwcache=521963582"></script>
+
+
+</body>
+</html>
